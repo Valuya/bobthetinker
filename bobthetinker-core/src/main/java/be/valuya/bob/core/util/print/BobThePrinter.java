@@ -6,6 +6,6 @@ public class BobThePrinter {
 
     public static void printPeriod(BobPeriod bobPeriod) {
         String label = bobPeriod.getLabel();
-        System.out.println(label);
+        System.out.println(label + ": " + bobPeriod.getStatus());
     }
 }
