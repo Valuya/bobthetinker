@@ -1,6 +1,7 @@
 package be.valuya.bob.core;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 public class BobPeriod {
 
@@ -10,25 +11,25 @@ public class BobPeriod {
     private String status;
     private boolean defaultPeriod;
     private String label;
-    private boolean ctrlPrint;
-    private String origin;
-    private int curLevel;
-    private boolean salesClosed;
-    private boolean purchasesClosed;
-    private boolean casClosed;
-    private boolean priClosed;
-    private String conversion;
-    private boolean fxActive;
-    private boolean fxClosed;
-    private boolean fxDepCalc;
-    private boolean fxPriGen;
-    private boolean fxNew;
-    private boolean fxMod;
-    private LocalDateTime fxModificationDateTime;
-    private LocalDateTime fxDepDateTime;
-    private LocalDateTime fxPriDateTime;
-    private String heading1;
-    private String heading2;
+    private Optional<Boolean> ctrlPrintOptional;
+    private Optional<String> originOptional;
+    private Optional<Integer> curLevelOptional;
+    private Optional<Boolean> salesClosedOptional;
+    private Optional<Boolean> purchasesClosedOptional;
+    private Optional<Boolean> casClosedOptional;
+    private Optional<Boolean> priClosedOptional;
+    private Optional<String> conversionOptional;
+    private Optional<Boolean> fxActiveOptional;
+    private Optional<Boolean> fxClosedOptional;
+    private Optional<Boolean> fxDepcalcOptional;
+    private Optional<Boolean> fxPrigenOptional;
+    private Optional<Boolean> fxNewOptional;
+    private Optional<Boolean> fxModOptional;
+    private Optional<LocalDateTime> fxModificationDateTimeOptional;
+    private Optional<LocalDateTime> fxDepDateTimeOptional;
+    private Optional<LocalDateTime> fxpriDateTimeOptional;
+    private Optional<String> heading1Optional;
+    private Optional<String> heading2Optional;
 
     public String getfYear() {
         return fYear;
@@ -78,155 +79,155 @@ public class BobPeriod {
         this.label = label;
     }
 
-    public boolean isCtrlPrint() {
-        return ctrlPrint;
+    public Optional<Boolean> getCtrlPrintOptional() {
+        return ctrlPrintOptional;
     }
 
-    public void setCtrlPrint(boolean ctrlPrint) {
-        this.ctrlPrint = ctrlPrint;
+    public void setCtrlPrintOptional(Optional<Boolean> ctrlPrintOptional) {
+        this.ctrlPrintOptional = ctrlPrintOptional;
     }
 
-    public String getOrigin() {
-        return origin;
+    public Optional<String> getOriginOptional() {
+        return originOptional;
     }
 
-    public void setOrigin(String origin) {
-        this.origin = origin;
+    public void setOriginOptional(Optional<String> originOptional) {
+        this.originOptional = originOptional;
     }
 
-    public int getCurLevel() {
-        return curLevel;
+    public Optional<Integer> getCurLevelOptional() {
+        return curLevelOptional;
     }
 
-    public void setCurLevel(int curLevel) {
-        this.curLevel = curLevel;
+    public void setCurLevelOptional(Optional<Integer> curLevelOptional) {
+        this.curLevelOptional = curLevelOptional;
     }
 
-    public boolean isSalesClosed() {
-        return salesClosed;
+    public Optional<Boolean> getSalesClosedOptional() {
+        return salesClosedOptional;
     }
 
-    public void setSalesClosed(boolean salesClosed) {
-        this.salesClosed = salesClosed;
+    public void setSalesClosedOptional(Optional<Boolean> salesClosedOptional) {
+        this.salesClosedOptional = salesClosedOptional;
     }
 
-    public boolean isPurchasesClosed() {
-        return purchasesClosed;
+    public Optional<Boolean> getPurchasesClosedOptional() {
+        return purchasesClosedOptional;
     }
 
-    public void setPurchasesClosed(boolean purchasesClosed) {
-        this.purchasesClosed = purchasesClosed;
+    public void setPurchasesClosedOptional(Optional<Boolean> purchasesClosedOptional) {
+        this.purchasesClosedOptional = purchasesClosedOptional;
     }
 
-    public boolean isCasClosed() {
-        return casClosed;
+    public Optional<Boolean> getCasClosedOptional() {
+        return casClosedOptional;
     }
 
-    public void setCasClosed(boolean casClosed) {
-        this.casClosed = casClosed;
+    public void setCasClosedOptional(Optional<Boolean> casClosedOptional) {
+        this.casClosedOptional = casClosedOptional;
     }
 
-    public boolean isPriClosed() {
-        return priClosed;
+    public Optional<Boolean> getPriClosedOptional() {
+        return priClosedOptional;
     }
 
-    public void setPriClosed(boolean priClosed) {
-        this.priClosed = priClosed;
+    public void setPriClosedOptional(Optional<Boolean> priClosedOptional) {
+        this.priClosedOptional = priClosedOptional;
     }
 
-    public String getConversion() {
-        return conversion;
+    public Optional<String> getConversionOptional() {
+        return conversionOptional;
     }
 
-    public void setConversion(String conversion) {
-        this.conversion = conversion;
+    public void setConversionOptional(Optional<String> conversionOptional) {
+        this.conversionOptional = conversionOptional;
     }
 
-    public boolean isFxActive() {
-        return fxActive;
+    public Optional<Boolean> getFxActiveOptional() {
+        return fxActiveOptional;
     }
 
-    public void setFxActive(boolean fxActive) {
-        this.fxActive = fxActive;
+    public void setFxActiveOptional(Optional<Boolean> fxActiveOptional) {
+        this.fxActiveOptional = fxActiveOptional;
     }
 
-    public boolean isFxClosed() {
-        return fxClosed;
+    public Optional<Boolean> getFxClosedOptional() {
+        return fxClosedOptional;
     }
 
-    public void setFxClosed(boolean fxClosed) {
-        this.fxClosed = fxClosed;
+    public void setFxClosedOptional(Optional<Boolean> fxClosedOptional) {
+        this.fxClosedOptional = fxClosedOptional;
     }
 
-    public boolean isFxDepCalc() {
-        return fxDepCalc;
+    public Optional<Boolean> getFxDepcalcOptional() {
+        return fxDepcalcOptional;
     }
 
-    public void setFxDepCalc(boolean fxDepCalc) {
-        this.fxDepCalc = fxDepCalc;
+    public void setFxDepcalcOptional(Optional<Boolean> fxDepcalcOptional) {
+        this.fxDepcalcOptional = fxDepcalcOptional;
     }
 
-    public boolean isFxPriGen() {
-        return fxPriGen;
+    public Optional<Boolean> getFxPrigenOptional() {
+        return fxPrigenOptional;
     }
 
-    public void setFxPriGen(boolean fxPriGen) {
-        this.fxPriGen = fxPriGen;
+    public void setFxPrigenOptional(Optional<Boolean> fxPrigenOptional) {
+        this.fxPrigenOptional = fxPrigenOptional;
     }
 
-    public boolean isFxNew() {
-        return fxNew;
+    public Optional<Boolean> getFxNewOptional() {
+        return fxNewOptional;
     }
 
-    public void setFxNew(boolean fxNew) {
-        this.fxNew = fxNew;
+    public void setFxNewOptional(Optional<Boolean> fxNewOptional) {
+        this.fxNewOptional = fxNewOptional;
     }
 
-    public boolean isFxMod() {
-        return fxMod;
+    public Optional<Boolean> getFxModOptional() {
+        return fxModOptional;
     }
 
-    public void setFxMod(boolean fxMod) {
-        this.fxMod = fxMod;
+    public void setFxModOptional(Optional<Boolean> fxModOptional) {
+        this.fxModOptional = fxModOptional;
     }
 
-    public LocalDateTime getFxModificationDateTime() {
-        return fxModificationDateTime;
+    public Optional<LocalDateTime> getFxModificationDateTimeOptional() {
+        return fxModificationDateTimeOptional;
     }
 
-    public void setFxModificationDateTime(LocalDateTime fxModificationDateTime) {
-        this.fxModificationDateTime = fxModificationDateTime;
+    public void setFxModificationDateTimeOptional(Optional<LocalDateTime> fxModificationDateTimeOptional) {
+        this.fxModificationDateTimeOptional = fxModificationDateTimeOptional;
     }
 
-    public LocalDateTime getFxDepDateTime() {
-        return fxDepDateTime;
+    public Optional<LocalDateTime> getFxDepDateTimeOptional() {
+        return fxDepDateTimeOptional;
     }
 
-    public void setFxDepDateTime(LocalDateTime fxDepDateTime) {
-        this.fxDepDateTime = fxDepDateTime;
+    public void setFxDepDateTimeOptional(Optional<LocalDateTime> fxDepDateTimeOptional) {
+        this.fxDepDateTimeOptional = fxDepDateTimeOptional;
     }
 
-    public LocalDateTime getFxPriDateTime() {
-        return fxPriDateTime;
+    public Optional<LocalDateTime> getFxpriDateTimeOptional() {
+        return fxpriDateTimeOptional;
     }
 
-    public void setFxPriDateTime(LocalDateTime fxPriDateTime) {
-        this.fxPriDateTime = fxPriDateTime;
+    public void setFxpriDateTimeOptional(Optional<LocalDateTime> fxpriDateTimeOptional) {
+        this.fxpriDateTimeOptional = fxpriDateTimeOptional;
     }
 
-    public String getHeading1() {
-        return heading1;
+    public Optional<String> getHeading1Optional() {
+        return heading1Optional;
     }
 
-    public void setHeading1(String heading1) {
-        this.heading1 = heading1;
+    public void setHeading1Optional(Optional<String> heading1Optional) {
+        this.heading1Optional = heading1Optional;
     }
 
-    public String getHeading2() {
-        return heading2;
+    public Optional<String> getHeading2Optional() {
+        return heading2Optional;
     }
 
-    public void setHeading2(String heading2) {
-        this.heading2 = heading2;
+    public void setHeading2Optional(Optional<String> heading2Optional) {
+        this.heading2Optional = heading2Optional;
     }
 }
