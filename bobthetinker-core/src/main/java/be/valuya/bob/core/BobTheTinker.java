@@ -49,6 +49,20 @@ public class BobTheTinker {
         }
     }
 
+    // TODO: stream them rather than read it fully in memory!
+    // will probably need a spliterator that is responsible for closing it, see jbooks
+    public List<BobCompany> readCompanies(BobSession bobSession) {
+        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+        try (InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_compan")) {
+            BobCompanyRecordReader bobCompanyRecordReader = new BobCompanyRecordReader();
+            return advantajeService.streamTable(tableInputStream)
+                    .map(bobCompanyRecordReader::readCompany)
+                    .collect(Collectors.toList());
+        } catch (IOException exception) {
+            throw new BobException("Cannot read companies.", exception);
+        }
+    }
+
     public static void main(String... args) {
         Path baseFolderPath = Paths.get("c:\\dev\\wbdata\\apizmeo-bob");
         BobFileConfiguration bobFileConfiguration = new BobFileConfiguration(baseFolderPath);
@@ -57,9 +71,10 @@ public class BobTheTinker {
         BobSession bobSession = bobTheTinker.openSession(bobFileConfiguration);
 
         bobSession.getBobPeriods()
-                .stream()
                 .forEach(BobThePrinter::printPeriod);
 
+        bobTheTinker.readCompanies(bobSession)
+                .forEach(BobThePrinter::printCompany);
     }
 
 }

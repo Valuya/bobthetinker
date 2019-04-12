@@ -1,7 +1,6 @@
 package be.valuya.bob.core;
 
 import be.valuya.advantaje.core.AdvantajeRecord;
-import be.valuya.advantaje.core.AdvantajeValue;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -65,7 +64,4 @@ public class BobPeriodRecordReader {
         return bobPeriod;
     }
 
-    private String getFieldName(AdvantajeValue<?> value) {
-        return value.getField().getName();
-    }
 }
