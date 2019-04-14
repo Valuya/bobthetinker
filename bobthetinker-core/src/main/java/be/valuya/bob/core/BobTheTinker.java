@@ -3,13 +3,10 @@ package be.valuya.bob.core;
 import be.valuya.advantaje.core.AdvantajeService;
 import be.valuya.bob.core.util.print.BobThePrinter;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -34,36 +31,29 @@ public class BobTheTinker {
     private AdvantajeService advantajeService = new AdvantajeService();
     private BobTheReader bobTheReader = new BobTheReader();
 
-    public BobSession openSession(BobFileConfiguration bobFileConfiguration) {
-        return new BobSession(bobFileConfiguration);
-    }
 
-    public Stream<BobPeriod> readPeriods(BobSession bobSession) {
-        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+    public Stream<BobPeriod> readPeriods(BobFileConfiguration bobFileConfiguration) {
         InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_period");
         BobPeriodRecordReader bobPeriodRecordReader = new BobPeriodRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(bobPeriodRecordReader::readPeriod);
     }
 
-    public Stream<BobCompany> readCompanies(BobSession bobSession) {
-        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+    public Stream<BobCompany> readCompanies(BobFileConfiguration bobFileConfiguration) {
         InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_compan");
         BobCompanyRecordReader bobCompanyRecordReader = new BobCompanyRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(bobCompanyRecordReader::readCompany);
     }
 
-    public Stream<BobAccount> readAccounts(BobSession bobSession) {
-        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+    public Stream<BobAccount> readAccounts(BobFileConfiguration bobFileConfiguration) {
         InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_accoun");
         BobAccountRecordReader accountRecordReader = new BobAccountRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(accountRecordReader::readAccount);
     }
 
-    public Stream<BobAccountingEntry> readAccountingEntries(BobSession bobSession) {
-        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+    public Stream<BobAccountingEntry> readAccountingEntries(BobFileConfiguration bobFileConfiguration) {
         InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_ahisto");
         BobAccountingEntryRecordReader accountingEntryRecordReader = new BobAccountingEntryRecordReader();
         return advantajeService.streamTable(tableInputStream)
@@ -75,9 +65,8 @@ public class BobTheTinker {
         BobFileConfiguration bobFileConfiguration = new BobFileConfiguration(baseFolderPath);
 
         BobTheTinker bobTheTinker = new BobTheTinker();
-        BobSession bobSession = bobTheTinker.openSession(bobFileConfiguration);
 
-        bobTheTinker.readCompanies(bobSession)
+        bobTheTinker.readCompanies(bobFileConfiguration)
                 .forEach(BobThePrinter::printCompany);
     }
 
