@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Utility to access Sage BOB proprietary data.
@@ -34,44 +35,47 @@ public class BobTheTinker {
     private BobTheReader bobTheReader = new BobTheReader();
 
     public BobSession openSession(BobFileConfiguration bobFileConfiguration) {
-        List<BobPeriod> bobPeriods = readPeriods(bobFileConfiguration);
-        return new BobSession(bobFileConfiguration, bobPeriods);
+        return new BobSession(bobFileConfiguration);
     }
 
-    public List<BobPeriod> readPeriods(BobFileConfiguration bobFileConfiguration) {
-        try (InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_period")) {
-            BobPeriodRecordReader bobPeriodRecordReader = new BobPeriodRecordReader();
-            return advantajeService.streamTable(tableInputStream)
-                    .map(bobPeriodRecordReader::readPeriod)
-                    .collect(Collectors.toList());
-        } catch (IOException exception) {
-            throw new BobException("Cannot read periods.", exception);
-        }
-    }
-
-    // TODO: stream them rather than read it fully in memory!
-    // will probably need a spliterator that is responsible for closing it, see jbooks
-    public List<BobCompany> readCompanies(BobSession bobSession) {
+    public Stream<BobPeriod> readPeriods(BobSession bobSession) {
         BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
-        try (InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_compan")) {
-            BobCompanyRecordReader bobCompanyRecordReader = new BobCompanyRecordReader();
-            return advantajeService.streamTable(tableInputStream)
-                    .map(bobCompanyRecordReader::readCompany)
-                    .collect(Collectors.toList());
-        } catch (IOException exception) {
-            throw new BobException("Cannot read companies.", exception);
-        }
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_period");
+        BobPeriodRecordReader bobPeriodRecordReader = new BobPeriodRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(bobPeriodRecordReader::readPeriod);
+    }
+
+    public Stream<BobCompany> readCompanies(BobSession bobSession) {
+        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_compan");
+        BobCompanyRecordReader bobCompanyRecordReader = new BobCompanyRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(bobCompanyRecordReader::readCompany);
+    }
+
+    public Stream<BobAccount> readAccounts(BobSession bobSession) {
+        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_accoun");
+        BobAccountRecordReader accountRecordReader = new BobAccountRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(accountRecordReader::readAccount);
+    }
+
+    public Stream<BobAccountingEntry> readAccountingEntries(BobSession bobSession) {
+        BobFileConfiguration bobFileConfiguration = bobSession.getBobFileConfiguration();
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_ahisto");
+        BobAccountingEntryRecordReader accountingEntryRecordReader = new BobAccountingEntryRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(accountingEntryRecordReader::readEntry);
     }
 
     public static void main(String... args) {
-        Path baseFolderPath = Paths.get("c:\\dev\\wbdata\\apizmeo-bob");
+        Path baseFolderPath = Paths.get("/home/cghislai/dev/valuya/gestemps/res/bob-data/APIZMEOData/");
         BobFileConfiguration bobFileConfiguration = new BobFileConfiguration(baseFolderPath);
 
         BobTheTinker bobTheTinker = new BobTheTinker();
         BobSession bobSession = bobTheTinker.openSession(bobFileConfiguration);
-
-        bobSession.getBobPeriods()
-                .forEach(BobThePrinter::printPeriod);
 
         bobTheTinker.readCompanies(bobSession)
                 .forEach(BobThePrinter::printCompany);
