@@ -1,11 +1,8 @@
 package be.valuya.bob.core;
 
 import be.valuya.advantaje.core.AdvantajeService;
-import be.valuya.bob.core.util.print.BobThePrinter;
 
 import java.io.InputStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -58,16 +55,6 @@ public class BobTheTinker {
         BobAccountingEntryRecordReader accountingEntryRecordReader = new BobAccountingEntryRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(accountingEntryRecordReader::readEntry);
-    }
-
-    public static void main(String... args) {
-        Path baseFolderPath = Paths.get("/home/cghislai/dev/valuya/gestemps/res/bob-data/APIZMEOData/");
-        BobFileConfiguration bobFileConfiguration = new BobFileConfiguration(baseFolderPath);
-
-        BobTheTinker bobTheTinker = new BobTheTinker();
-
-        bobTheTinker.readCompanies(bobFileConfiguration)
-                .forEach(BobThePrinter::printCompany);
     }
 
 }

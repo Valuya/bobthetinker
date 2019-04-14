@@ -1,7 +1,9 @@
 package be.valuya.bob.core.api.troll;
 
+import be.valuya.accountingtroll.BalanceChangeEvent;
 import be.valuya.bob.core.BobFileConfiguration;
 import be.valuya.bob.core.BobSession;
+import be.valuya.bob.core.util.print.BobThePrinter;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -15,6 +17,7 @@ public class BobTrollAccountingServiceTest {
 
     private MemoryCachingBobAccountingManager bobAccountingManager;
     private BobSession session;
+    private BobThePrinter bobThePrinter;
 
     @Before
     public void setup() {
@@ -28,35 +31,36 @@ public class BobTrollAccountingServiceTest {
     @Test
     public void testStreamAccounts() {
         bobAccountingManager.streamAccounts()
-                .forEach(this::debug);
+                .forEach(bobThePrinter::printAccount);
     }
 
     @Test
     public void testStreamBookYears() {
         bobAccountingManager.streamBookYears()
-                .forEach(this::debug);
+                .forEach(bobThePrinter::printBookYear);
     }
 
     @Test
     public void testStreamPeriods() {
         bobAccountingManager.streamPeriods()
-                .forEach(this::debug);
+                .forEach(bobThePrinter::printPeriod);
     }
 
     @Test
     public void testStreamThirdParties() {
         bobAccountingManager.streamThirdParties()
-                .forEach(this::debug);
+                .forEach(bobThePrinter::printThirdParty);
     }
 
     @Test
     public void testStreamEntries() {
-        bobAccountingManager.streamAccountingEntries()
-                .forEach(this::debug);
+        bobAccountingManager.streamAccountingEntries(event -> handleEvent(event))
+                .forEach(bobThePrinter::printAccountingEntry);
     }
 
-    private void debug(Object valueObject) {
-        System.out.println(valueObject);
+    private void handleEvent(BalanceChangeEvent balanceChangeEvent) {
+        bobThePrinter = new BobThePrinter();
+        bobThePrinter.printBalanceChangeEvent(balanceChangeEvent);
     }
 
 }
