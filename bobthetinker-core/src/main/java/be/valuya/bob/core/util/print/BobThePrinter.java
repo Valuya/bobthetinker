@@ -49,7 +49,10 @@ public class BobThePrinter {
         BigDecimal amount = accountingEntry.getAmount();
         Optional<ATAccount> accountOptional = accountingEntry.getAccountOptional();
         String accountStr = accountOptional.map(ATAccount::getName).orElse(ABSENT_PLACEHOLDER);
-        String message = MessageFormat.format("accounting entry,: account {2}, {0}, {1} €", date, amount, accountStr);
+        String accountCode = accountOptional.map(ATAccount::getCode).orElse(ABSENT_PLACEHOLDER);
+        String dbkCode = accountingEntry.getDbkCode();
+        String message = MessageFormat.format("accounting entry: [{4}] {0}, account {3} ({2}), {1} €",
+                date, amount, accountStr, accountCode, dbkCode);
         System.out.println(message);
     }
 

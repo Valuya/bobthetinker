@@ -88,21 +88,21 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .filter(this::isValidCompany)
                 .map(this::convertToTrollThirdParty);
     }
-//
-//    @Override
-//    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-//        return bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
-//                .filter(this::isValidHistoryEntry)
-//                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
-//    }
-
 
     @Override
     public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-        return bobTheTinker.readCompanyHistoryEntries(bobFileConfiguration)
+        return bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
                 .filter(this::isValidHistoryEntry)
                 .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
     }
+
+//
+//    @Override
+//    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
+//        return bobTheTinker.readCompanyHistoryEntries(bobFileConfiguration)
+//                .filter(this::isValidHistoryEntry)
+//                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
+//    }
 
     private boolean isValidAccount(BobAccount bobAccount) {
         String aid = bobAccount.getAid();
@@ -148,6 +148,11 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 ;
     }
 
+    private Stream<ATAccountingEntry> convertWithBalanceCheck(BobAccountHistoryEntry entry, AccountingEventListener accountingEventListener) {
+        ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
+        return Stream.of(atAccountingEntry);
+    }
+
     private Stream<ATAccountingEntry> convertWithBalanceCheck(BobCompanyHistoryEntry entry, AccountingEventListener accountingEventListener) {
         ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
         return Stream.of(atAccountingEntry);
@@ -158,6 +163,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         String name = bobAccount.getHeading1Optional()
                 .orElse("-");
 
+        return createAccount(accountNumber, name);
+    }
+
+    private ATAccount createAccount(String accountNumber, String name) {
         ATAccount account = new ATAccount();
         account.setCode(accountNumber);
         account.setName(name);
@@ -263,8 +272,8 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
         BigDecimal amount = entry.getHamountOptional().orElseThrow(() -> new BobException("No amount for entry"));
 
-        Optional<String> accountNumber = entry.getCntrprtaccOptional();
-        Optional<ATAccount> accountOptional = accountNumber.flatMap(this::findAccountByCode);
+        String accountNumber = entry.getHid();
+        Optional<ATAccount> accountOptional = this.findAccountByCode(accountNumber);
 
         Optional<String> thirdPartyName = entry.getHcussupOptional();
         Optional<ATThirdParty> thirdPartyOptional = thirdPartyName.flatMap(this::findThirdPartyById);
@@ -406,6 +415,12 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return bookYearPeriods.stream()
                 .filter(p -> p.getName().equals(name))
                 .findAny();
+    }
+
+    public ATAccount findOrCreateAccountByCode(String code) {
+        ATAccount accountNullable = getAccounts().get(code);
+        return Optional.ofNullable(accountNullable)
+                .orElseGet(() -> createAccount(code, "<ABSENT_FROM_ACCOUNT_TABLE>"));
     }
 
     public Optional<ATAccount> findAccountByCode(String code) {
