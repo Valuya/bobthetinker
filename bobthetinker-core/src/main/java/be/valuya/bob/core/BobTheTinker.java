@@ -2,7 +2,14 @@ package be.valuya.bob.core;
 
 import be.valuya.advantaje.core.AdvantajeService;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -23,35 +30,52 @@ import java.util.stream.Stream;
  */
 public class BobTheTinker {
 
+    public static final String ACCOUNT_TABLE_NAME = "ac_accoun";
+    public static final String PERIOD_TABLE_NAME = "ac_period";
+    public static final String COMPANY_TABLE_NAME = "ac_compan";
+    public static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
+
     private static Logger LOGGER = Logger.getLogger(BobTheTinker.class.getName());
 
     private AdvantajeService advantajeService = new AdvantajeService();
     private BobTheReader bobTheReader = new BobTheReader();
 
 
+    public Optional<LocalDateTime> getLastAccountModifiactionDate(BobFileConfiguration fileConfiguration) {
+        try {
+            Path tableFilePath = bobTheReader.getTableFilePath(fileConfiguration, ACCOUNT_TABLE_NAME);
+            FileTime lastModifiedTime = Files.getLastModifiedTime(tableFilePath);
+            Instant lastModifiedInstant = lastModifiedTime.toInstant();
+            LocalDateTime dateTime = LocalDateTime.from(lastModifiedInstant);
+            return Optional.of(dateTime);
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
     public Stream<BobPeriod> readPeriods(BobFileConfiguration bobFileConfiguration) {
-        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_period");
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, PERIOD_TABLE_NAME);
         BobPeriodRecordReader bobPeriodRecordReader = new BobPeriodRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(bobPeriodRecordReader::readPeriod);
     }
 
     public Stream<BobCompany> readCompanies(BobFileConfiguration bobFileConfiguration) {
-        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_compan");
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, COMPANY_TABLE_NAME);
         BobCompanyRecordReader bobCompanyRecordReader = new BobCompanyRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(bobCompanyRecordReader::readCompany);
     }
 
     public Stream<BobAccount> readAccounts(BobFileConfiguration bobFileConfiguration) {
-        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_accoun");
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, ACCOUNT_TABLE_NAME);
         BobAccountRecordReader accountRecordReader = new BobAccountRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(accountRecordReader::readAccount);
     }
 
     public Stream<BobAccountingEntry> readAccountingEntries(BobFileConfiguration bobFileConfiguration) {
-        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, "ac_ahisto");
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, ACCOUNT_HISTORY_TABLE_NAME);
         BobAccountingEntryRecordReader accountingEntryRecordReader = new BobAccountingEntryRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(accountingEntryRecordReader::readEntry);

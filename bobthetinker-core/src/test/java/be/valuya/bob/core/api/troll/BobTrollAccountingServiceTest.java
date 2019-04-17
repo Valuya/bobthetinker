@@ -1,8 +1,6 @@
 package be.valuya.bob.core.api.troll;
 
-import be.valuya.accountingtroll.BalanceChangeEvent;
 import be.valuya.bob.core.BobFileConfiguration;
-import be.valuya.bob.core.BobSession;
 import be.valuya.bob.core.util.print.BobThePrinter;
 import org.junit.Before;
 import org.junit.Test;
@@ -16,8 +14,8 @@ import java.nio.file.Paths;
 public class BobTrollAccountingServiceTest {
 
     private MemoryCachingBobAccountingManager bobAccountingManager;
-    private BobSession session;
     private BobThePrinter bobThePrinter;
+    private TestAccountingEventListener eventListener;
 
     @Before
     public void setup() {
@@ -26,6 +24,8 @@ public class BobTrollAccountingServiceTest {
 
         BobFileConfiguration fileConfiguration = new BobFileConfiguration(baseFolderPath);
         bobAccountingManager = new MemoryCachingBobAccountingManager(fileConfiguration);
+        bobThePrinter = new BobThePrinter();
+        eventListener = new TestAccountingEventListener();
     }
 
     @Test
@@ -54,13 +54,8 @@ public class BobTrollAccountingServiceTest {
 
     @Test
     public void testStreamEntries() {
-        bobAccountingManager.streamAccountingEntries(event -> handleEvent(event))
+        bobAccountingManager.streamAccountingEntries(eventListener)
                 .forEach(bobThePrinter::printAccountingEntry);
-    }
-
-    private void handleEvent(BalanceChangeEvent balanceChangeEvent) {
-        bobThePrinter = new BobThePrinter();
-        bobThePrinter.printBalanceChangeEvent(balanceChangeEvent);
     }
 
 }

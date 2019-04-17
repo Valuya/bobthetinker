@@ -18,6 +18,17 @@ public class BobTheReader {
     private static Logger LOGGER = Logger.getLogger(BobTheReader.class.getName());
     public static final String ADT_EXTENSION = ".adt";
 
+
+    public InputStream getTableInputStream(BobFileConfiguration bobFileConfiguration, String tableName) {
+        Path path = getTableFilePath(bobFileConfiguration, tableName);
+        return getFastInputStream(bobFileConfiguration, path);
+    }
+
+    public Path getTableFilePath(BobFileConfiguration bobFileConfiguration, String tableName) {
+        return resolveTablePath(bobFileConfiguration, tableName);
+    }
+
+
     private Path resolveTablePath(BobFileConfiguration bobFileConfiguration, String tableName) {
         return resolveTablePathOptional(bobFileConfiguration, tableName)
                 .orElseThrow(() -> {
@@ -86,11 +97,6 @@ public class BobTheReader {
 
     private String getTableFileName(BobFileConfiguration bobFileConfiguration, String tableName) {
         return tableName + ADT_EXTENSION;
-    }
-
-    public InputStream getTableInputStream(BobFileConfiguration bobFileConfiguration, String tableName) {
-        Path path = resolveTablePath(bobFileConfiguration, tableName);
-        return getFastInputStream(bobFileConfiguration, path);
     }
 
     private InputStream getFastInputStream(BobFileConfiguration bobFileConfiguration, Path path) {

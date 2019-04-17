@@ -1,11 +1,11 @@
 package be.valuya.bob.core.util.print;
 
-import be.valuya.accountingtroll.BalanceChangeEvent;
-import be.valuya.accountingtroll.domain.Account;
-import be.valuya.accountingtroll.domain.AccountingEntry;
-import be.valuya.accountingtroll.domain.BookPeriod;
-import be.valuya.accountingtroll.domain.BookYear;
-import be.valuya.accountingtroll.domain.ThirdParty;
+import be.valuya.accountingtroll.domain.ATAccount;
+import be.valuya.accountingtroll.domain.ATAccountingEntry;
+import be.valuya.accountingtroll.domain.ATBookPeriod;
+import be.valuya.accountingtroll.domain.ATBookYear;
+import be.valuya.accountingtroll.domain.ATThirdParty;
+import be.valuya.accountingtroll.event.BalanceChangeEvent;
 import be.valuya.bob.core.BobCompany;
 import be.valuya.bob.core.BobPeriod;
 
@@ -24,7 +24,7 @@ public class BobThePrinter {
         System.out.println(message);
     }
 
-    public void printPeriod(BookPeriod period) {
+    public void printPeriod(ATBookPeriod period) {
         String name = period.getName();
         String message = MessageFormat.format("period: {0}", name);
         System.out.println(message);
@@ -44,26 +44,26 @@ public class BobThePrinter {
         System.out.println(stringBuilder);
     }
 
-    public void printAccountingEntry(AccountingEntry accountingEntry) {
+    public void printAccountingEntry(ATAccountingEntry accountingEntry) {
         LocalDate date = accountingEntry.getDate();
         BigDecimal amount = accountingEntry.getAmount();
-        Optional<Account> accountOptional = accountingEntry.getAccountOptional();
-        String accountStr = accountOptional.map(Account::getName).orElse(ABSENT_PLACEHOLDER);
+        Optional<ATAccount> accountOptional = accountingEntry.getAccountOptional();
+        String accountStr = accountOptional.map(ATAccount::getName).orElse(ABSENT_PLACEHOLDER);
         String message = MessageFormat.format("accounting entry,: account {3}, {0}, {1} €", date, amount, accountStr);
         System.out.println(message);
     }
 
-    public void printAccount(Account account) {
+    public void printAccount(ATAccount account) {
         String name = account.getName();
         System.out.println(name);
     }
 
-    public void printBookYear(BookYear bookYear) {
+    public void printBookYear(ATBookYear bookYear) {
         String name = bookYear.getName();
         System.out.println(name);
     }
 
-    public void printThirdParty(ThirdParty thirdParty) {
+    public void printThirdParty(ATThirdParty thirdParty) {
         String fullName = thirdParty.getFullNameOptional()
                 .orElse(ABSENT_PLACEHOLDER);
         String message = MessageFormat.format("Third party: {0}", fullName);
@@ -71,7 +71,7 @@ public class BobThePrinter {
     }
 
     public void printBalanceChangeEvent(BalanceChangeEvent balanceChangeEvent) {
-        Account account = balanceChangeEvent.getAccount();
+        ATAccount account = balanceChangeEvent.getAccount();
         BigDecimal newBalance = balanceChangeEvent.getNewBalance();
         String message = MessageFormat.format("Balance change: account {0}, {1}", account, newBalance);
         System.out.println(message);
