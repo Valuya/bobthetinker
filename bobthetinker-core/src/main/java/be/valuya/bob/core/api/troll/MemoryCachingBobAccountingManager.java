@@ -6,11 +6,15 @@ import be.valuya.accountingtroll.domain.ATAccount;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
+import be.valuya.accountingtroll.domain.ATDocument;
+import be.valuya.accountingtroll.domain.ATPeriodType;
+import be.valuya.accountingtroll.domain.ATTax;
 import be.valuya.accountingtroll.domain.ATThirdParty;
 import be.valuya.accountingtroll.domain.ATThirdPartyType;
 import be.valuya.bob.core.BobAccount;
-import be.valuya.bob.core.BobAccountingEntry;
+import be.valuya.bob.core.BobAccountHistoryEntry;
 import be.valuya.bob.core.BobCompany;
+import be.valuya.bob.core.BobCompanyHistoryEntry;
 import be.valuya.bob.core.BobException;
 import be.valuya.bob.core.BobFileConfiguration;
 import be.valuya.bob.core.BobPeriod;
@@ -32,7 +36,7 @@ import java.util.stream.Stream;
 
 public class MemoryCachingBobAccountingManager implements AccountingManager {
 
-    public static final Comparator<BobPeriod> BOB_PERIOD_COMPARATOR = Comparator.comparing(BobPeriod::getfYear)
+    private static final Comparator<BobPeriod> BOB_PERIOD_COMPARATOR = Comparator.comparing(BobPeriod::getfYear)
             .thenComparing(BobPeriod::getYear)
             .thenComparing(BobPeriod::getMonth);
     private final BobTheTinker bobTheTinker;
@@ -84,13 +88,21 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .filter(this::isValidCompany)
                 .map(this::convertToTrollThirdParty);
     }
+//
+//    @Override
+//    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
+//        return bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
+//                .filter(this::isValidHistoryEntry)
+//                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
+//    }
+
 
     @Override
     public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-        return bobTheTinker.readAccountingEntries(bobFileConfiguration)
-                .map(entry -> this.convertToTrollAccountingEntry(entry));
+        return bobTheTinker.readCompanyHistoryEntries(bobFileConfiguration)
+                .filter(this::isValidHistoryEntry)
+                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
     }
-
 
     private boolean isValidAccount(BobAccount bobAccount) {
         String aid = bobAccount.getAid();
@@ -105,10 +117,40 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private boolean isValidPeriod(BobPeriod bobPeriod) {
         String label = bobPeriod.getLabel();
-        int month = bobPeriod.getMonth();
-        return label != null && !label.trim().isEmpty()
-                // There is a wildcard period with month 0
-                && month > 0;
+        return label != null && !label.trim().isEmpty();
+    }
+
+
+    private boolean isValidHistoryEntry(BobAccountHistoryEntry historyEntry) {
+        String hid = historyEntry.getHid();
+        Optional<Integer> hmonthOptional = historyEntry.getHmonthOptional();
+        Optional<Integer> hyearOptional = historyEntry.getHyearOptional();
+        Optional<String> hdbkOptional = historyEntry.getHdbkOptional();
+        Optional<BigDecimal> hamountOptional = historyEntry.getHamountOptional();
+        return hid != null && !hid.trim().isEmpty()
+                && hmonthOptional.isPresent()
+                && hyearOptional.isPresent()
+                && hdbkOptional.isPresent()
+                && hamountOptional.isPresent()
+                ;
+    }
+
+
+    private boolean isValidHistoryEntry(BobCompanyHistoryEntry historyEntry) {
+        String hid = historyEntry.getHid();
+        String htype = historyEntry.getHtype();
+        String hfyear = historyEntry.getHfyear();
+        Optional<String> hdbkOptional = historyEntry.getHdbk();
+        return hid != null && !hid.trim().isEmpty()
+                && htype != null && !htype.trim().isEmpty()
+                && hfyear != null && !hfyear.trim().isEmpty()
+                && hdbkOptional.isPresent()
+                ;
+    }
+
+    private Stream<ATAccountingEntry> convertWithBalanceCheck(BobCompanyHistoryEntry entry, AccountingEventListener accountingEventListener) {
+        ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
+        return Stream.of(atAccountingEntry);
     }
 
     private ATAccount convertToTrollAccount(BobAccount bobAccount) {
@@ -125,6 +167,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private ATBookYear convertToTrollBookYear(String fYear, List<BobPeriod> periods) {
         BobPeriod firstPeriod = periods.stream()
                 .filter(this::isValidPeriod)
+                .filter(p -> p.getMonth() > 0)
                 .findFirst()
                 .orElseThrow(IllegalStateException::new);
         BobPeriod lastPeriod = periods.get(periods.size() - 1);
@@ -145,14 +188,27 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         ATBookYear bookYear = findBookYearByName(yearName)
                 .orElseThrow(() -> new BobException("No book year matching " + yearName));
         String periodShortName = bobPeriod.getLabel();
-        LocalDate periodStartDate = getPeriodStartDate(bobPeriod);
-        LocalDate periodEndDate = getPeriodEndDate(bobPeriod);
+        int month = bobPeriod.getMonth();
+
+        LocalDate periodStartDate;
+        LocalDate periodEndDate;
+        ATPeriodType periodType;
+        if (month == 0) {
+            periodStartDate = bookYear.getStartDate();
+            periodEndDate = bookYear.getEndDate();
+            periodType = ATPeriodType.OPENING; // Its a wildcard period apparently covering the book year
+        } else {
+            periodStartDate = getPeriodStartDate(bobPeriod);
+            periodEndDate = getPeriodEndDate(bobPeriod);
+            periodType = ATPeriodType.GENERAL;
+        }
 
         ATBookPeriod bookPeriod = new ATBookPeriod();
         bookPeriod.setBookYear(bookYear);
         bookPeriod.setName(periodShortName);
         bookPeriod.setStartDate(periodStartDate);
         bookPeriod.setEndDate(periodEndDate);
+        bookPeriod.setPeriodType(periodType);
         return bookPeriod;
     }
 
@@ -162,12 +218,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         Optional<String> vatNumberOptional = bobCompany.getcVatNumberOptional()
                 .map(Optional::of)
                 .orElseGet(bobCompany::getsVatNumberOptional);
-        Optional<String> vatCat = bobCompany.getcVatCategoryOptional();
 
         ATThirdParty thirdParty = createBaseThirdParty(bobCompany);
         thirdParty.setType(ATThirdPartyType.CLIENT);
         thirdParty.setVatNumber(vatNumberOptional.orElse(null));
-        thirdParty.setVatCode(vatCat.orElse(null));
         return thirdParty;
     }
 
@@ -195,57 +249,122 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return baseThirdParty;
     }
 
-    private ATAccountingEntry convertToTrollAccountingEntry(BobAccountingEntry entry) {
+    private ATAccountingEntry convertToTrollAccountingEntry(BobAccountHistoryEntry entry) {
         ATBookYear bookYear = entry.getHfyearOptional()
                 .flatMap(this::findBookYearByName)
                 .orElseThrow(() -> new BobException("No book year found with name " + entry.getHfyearOptional()));
 
         ATBookPeriod bookPeriod = listYearPeriods(bookYear).stream()
-                .filter(p -> this.isSamePeriod(p, entry))
+                .filter(p -> this.isSameBookYearPeriod(p, entry))
                 .findAny()
                 .orElseThrow(() -> new BobException("No period found in entry for book year " + bookYear));
 
+        String dbkCode = entry.getHdbkOptional().orElseThrow(() -> new BobException("No dbk entry for accounting entry"));
+
         BigDecimal amount = entry.getHamountOptional().orElseThrow(() -> new BobException("No amount for entry"));
-        // TODO: only a vat code in entries. Needs to lookup another table?
 
         Optional<String> accountNumber = entry.getCntrprtaccOptional();
-        Optional<ATAccount> accountOptional = accountNumber.flatMap(number -> findAccountByCode(number));
+        Optional<ATAccount> accountOptional = accountNumber.flatMap(this::findAccountByCode);
 
         Optional<String> thirdPartyName = entry.getHcussupOptional();
-        Optional<ATThirdParty> thirdPartyOptional = thirdPartyName.flatMap(name -> findThirdPartyById(name));
-
+        Optional<ATThirdParty> thirdPartyOptional = thirdPartyName.flatMap(this::findThirdPartyById);
 
         LocalDate entryDate = entry.getHdocdateOptional().orElseThrow(() -> new BobException("No date for entry"));
         Optional<LocalDate> documentDateOptional = entry.getHdocdateOptional();
         Optional<LocalDate> dueDateOptional = entry.getHduedateOptional();
         Optional<String> commentOptional = entry.getHremOptional();
 
+        Optional<ATTax> taxOptional = Optional.empty(); //TODO
+        Optional<ATDocument> documentOptional = Optional.empty(); // TODO
+
         ATAccountingEntry accountingEntry = new ATAccountingEntry();
         accountingEntry.setBookPeriod(bookPeriod);
         accountingEntry.setDate(entryDate);
         accountingEntry.setAmount(amount);
+        accountingEntry.setDbkCode(dbkCode);
 
         accountingEntry.setAccountOptional(accountOptional);
         accountingEntry.setThirdPartyOptional(thirdPartyOptional);
         accountingEntry.setDocumentDateOptional(documentDateOptional);
         accountingEntry.setDueDateOptional(dueDateOptional);
         accountingEntry.setCommentOptional(commentOptional);
+        accountingEntry.setTaxOptional(taxOptional);
+        accountingEntry.setDocumentOptional(documentOptional);
 
         return accountingEntry;
     }
 
-    private boolean isSamePeriod(ATBookPeriod bookPeriod, BobAccountingEntry accountingEntry) {
+
+    private ATAccountingEntry convertToTrollAccountingEntry(BobCompanyHistoryEntry entry) {
+        String hfyear = entry.getHfyear();
+        ATBookYear bookYear = findBookYearByName(hfyear)
+                .orElseThrow(() -> new BobException("No book year found with name " + hfyear));
+
+        ATBookPeriod bookPeriod = listYearPeriods(bookYear).stream()
+                .filter(p -> this.isSameBookYearPeriod(p, entry))
+                .findAny()
+                .orElseThrow(() -> new BobException("No period found in entry for book year " + bookYear + " and month " + entry.getHmmonth() + " and year  " + entry.getHyear()));
+
+        String hdbk = entry.getHdbk().orElseThrow(() -> new BobException("No dbk for entry"));
+        BigDecimal amount = entry.getHamount().orElseThrow(() -> new BobException("No amount for entry"));
+
+        Optional<ATAccount> accountOptional = entry.getHcollectacc()
+                .flatMap(this::findAccountByCode);
+
+        String hid = entry.getHid();
+        Optional<ATThirdParty> thirdPartyOptional = this.findThirdPartyById(hid);
+
+        LocalDate entryDate = entry.getHdocdate().orElseThrow(() -> new BobException("No date for entry"));
+        Optional<LocalDate> documentDateOptional = entry.getHdocdate();
+        Optional<LocalDate> dueDateOptional = entry.getHduedate();
+        Optional<String> commentOptional = Optional.empty();
+        Optional<Integer> hmatchno = entry.getHmatchno();
+
+        Optional<ATTax> taxOptional = Optional.empty(); //TODO
+        Optional<ATDocument> documentOptional = Optional.empty(); // TODO
+        Optional<ATDocument> matchedDocumentOptional = Optional.empty(); //TODO
+
+        ATAccountingEntry accountingEntry = new ATAccountingEntry();
+        accountingEntry.setBookPeriod(bookPeriod);
+        accountingEntry.setDate(entryDate);
+        accountingEntry.setAmount(amount);
+        accountingEntry.setDbkCode(hdbk);
+        accountingEntry.setMatched(hmatchno.isPresent());
+
+        accountingEntry.setAccountOptional(accountOptional);
+        accountingEntry.setThirdPartyOptional(thirdPartyOptional);
+        accountingEntry.setDocumentDateOptional(documentDateOptional);
+        accountingEntry.setDueDateOptional(dueDateOptional);
+        accountingEntry.setCommentOptional(commentOptional);
+        accountingEntry.setTaxOptional(taxOptional);
+        accountingEntry.setDocumentOptional(documentOptional);
+        accountingEntry.setMatchedDocumentOptional(matchedDocumentOptional);
+
+        return accountingEntry;
+    }
+
+    private boolean isSameBookYearPeriod(ATBookPeriod bookPeriod, BobAccountHistoryEntry accountingEntry) {
         int year = accountingEntry.getHyearOptional().orElseThrow(() -> new BobException("No year set in entry"));
         int month = accountingEntry.getHmonthOptional().orElseThrow(() -> new BobException("No month set in entry"));
+        return isSamePeriod(bookPeriod, year, month);
+    }
+
+    private boolean isSameBookYearPeriod(ATBookPeriod bookPeriod, BobCompanyHistoryEntry historyEntry) {
+        int year = historyEntry.getHyear().orElseThrow(() -> new BobException("No year set in entry"));
+        int month = historyEntry.getHmonth().orElseThrow(() -> new BobException("No month set in entry"));
+        return isSamePeriod(bookPeriod, year, month);
+    }
+
+    private boolean isSamePeriod(ATBookPeriod bookPeriod, int year, int month) {
         if (month == 0) {
-            // FIXME: openings are set to the wildcard period **/2018, with month index 0
-            return true; // use the first period
+            return bookPeriod.getPeriodType() == ATPeriodType.OPENING;
         }
         LocalDate startDate = bookPeriod.getStartDate();
         int periodYear = startDate.get(ChronoField.YEAR);
         int periodMonth = startDate.get(ChronoField.MONTH_OF_YEAR);
         return periodYear == year && periodMonth == month;
     }
+
 
     private LocalDate getPeriodEndDate(BobPeriod period) {
         int lastYear = period.getYear();

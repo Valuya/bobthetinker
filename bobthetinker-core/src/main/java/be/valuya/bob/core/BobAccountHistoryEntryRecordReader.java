@@ -7,9 +7,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-public class BobAccountingEntryRecordReader {
+public class BobAccountHistoryEntryRecordReader {
 
-    public BobAccountingEntry readEntry(AdvantajeRecord advantajeRecord) {
+    public BobAccountHistoryEntry readEntry(AdvantajeRecord advantajeRecord) {
         String hid = advantajeRecord.getValue("HID"); //: (STRING, 10): 1
         Optional<String> hdbk = advantajeRecord.getValueOptional("HDBK"); // STRING - 4 -
         Optional<String> hfyear = advantajeRecord.getValueOptional("HFYEAR"); // STRING - 5 -
@@ -56,7 +56,7 @@ public class BobAccountingEntryRecordReader {
         Optional<BigDecimal> htaxBigDecimal = htax.map(BigDecimal::new);
         Optional<BigDecimal> htaxndBigDecimal = htaxnd.map(BigDecimal::new);
 
-        BobAccountingEntry accountingEntry = new BobAccountingEntry();
+        BobAccountHistoryEntry accountingEntry = new BobAccountHistoryEntry();
         accountingEntry.setHid(hid);
         accountingEntry.setHdbk(hdbk.orElse(null));
         accountingEntry.setHfyear(hfyear.orElse(null));

@@ -34,6 +34,7 @@ public class BobTheTinker {
     public static final String PERIOD_TABLE_NAME = "ac_period";
     public static final String COMPANY_TABLE_NAME = "ac_compan";
     public static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
+    public static final String COMPANY_HISTORY_TABLE_NAME = "ac_chisto";
 
     private static Logger LOGGER = Logger.getLogger(BobTheTinker.class.getName());
 
@@ -74,11 +75,18 @@ public class BobTheTinker {
                 .map(accountRecordReader::readAccount);
     }
 
-    public Stream<BobAccountingEntry> readAccountingEntries(BobFileConfiguration bobFileConfiguration) {
+    public Stream<BobAccountHistoryEntry> readAccountHistoryEntries(BobFileConfiguration bobFileConfiguration) {
         InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, ACCOUNT_HISTORY_TABLE_NAME);
-        BobAccountingEntryRecordReader accountingEntryRecordReader = new BobAccountingEntryRecordReader();
+        BobAccountHistoryEntryRecordReader accountingEntryRecordReader = new BobAccountHistoryEntryRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(accountingEntryRecordReader::readEntry);
+    }
+
+    public Stream<BobCompanyHistoryEntry> readCompanyHistoryEntries(BobFileConfiguration bobFileConfiguration) {
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, COMPANY_HISTORY_TABLE_NAME);
+        BobCompanyHistoryEntryRecordReader recordReader = new BobCompanyHistoryEntryRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(recordReader::readEntry);
     }
 
 }

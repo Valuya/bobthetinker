@@ -9,18 +9,40 @@ import java.util.Optional;
 /**
  * table ac_ahisto
  */
-public class BobAccountingEntry {
+public class BobAccountHistoryEntry {
 
     @NotNull
     private String hid; // STRING - 10 -
 
+    /**
+     * Journal code? 'ODV', 'ACH',
+     */
     private String hdbk; // STRING - 4 -
+    /**
+     * Book year label
+     */
     private String hfyear; // STRING - 5 -
+    /**
+     * Might be 0, in which case hdbk seems to be 'REO', and horderno seems incremented for
+     * each account (hid) and ctrprtacc is '**'.
+     */
     private Integer hmonth; // INTEGER - 4 -
     private Integer hdocno; // INTEGER - 4 -
+    /**
+     * Looks like this can be used to check whether the ledger entry is matched.
+     * An entry with hid=A, cntrprtacc=B, horderno=1 should be matched with an entry
+     * with hid=B, cntrprtacc=A, horderno=2. Sometimes it goes further than 2.
+     */
     private Integer horderno; // INTEGER - 4 -
+    /**
+     * 'CAS', 'PRI', 'PUR', ..
+     */
     private String hdbtype; // STRING - 3 -
     private Integer hyear; // INTEGER - 4 -
+    /**
+     * Name (id) of the customer/supplier company.
+     * The hcstype seems to be set when this field is set
+     */
     private String hcussup; // STRING - 10 -
     private LocalDate hdocdate; // DATE - 4 -
     private LocalDate hduedate; // DATE - 4 -
@@ -42,15 +64,28 @@ public class BobAccountingEntry {
     private LocalDateTime createdon; // TIMESTAMP - 8 -
     private String modifiedby; // STRING - 10 -
     private LocalDateTime modifiedon; // TIMESTAMP - 8 -
+    /**
+     * Most often point to another hid.
+     * Sometimes '**', when not matched?
+     */
     private String cntrprtacc; // STRING - 10 -
+    /**
+     * 'CAS', 'ACC', 'SUP'. When 'SUP', hcstype seems set to S
+     */
     private String htype; // STRING - 3 -
     private Boolean hdiscadv; // LOGICAL - 1 -
     private String hmfyear; // STRING - 5 -
     private Integer hmyear; // INTEGER - 4 -
     private Integer hmmonth; // INTEGER - 4 -
     private LocalDate hmdate; // DATE - 4 -
+    /**
+     * Often empty, sometimes 'S'
+     */
     private String hcstype; // STRING - 1 -
     private String chkdigit; // STRING - 10 -
+    /**
+     * Seems always D
+     */
     private String hvatmode; // STRING - 1 -
 
     public String getHid() {
