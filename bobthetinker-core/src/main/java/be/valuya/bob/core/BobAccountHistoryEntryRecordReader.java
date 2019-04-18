@@ -3,6 +3,7 @@ package be.valuya.bob.core;
 import be.valuya.advantaje.core.AdvantajeRecord;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -50,11 +51,11 @@ public class BobAccountHistoryEntryRecordReader {
         Optional<String> chkdigit = advantajeRecord.getValueOptional("CHKDIGIT"); // STRING - 10 -
         Optional<String> hvatmode = advantajeRecord.getValueOptional("HVATMODE"); // STRING - 1 -
 
-        Optional<BigDecimal> amountBigDecimal = hamount.map(BigDecimal::new);
-        Optional<BigDecimal> hcuramnBigDecimal = hcuramn.map(BigDecimal::new);
-        Optional<BigDecimal> hbaseBigDecimal = hbase.map(BigDecimal::new);
-        Optional<BigDecimal> htaxBigDecimal = htax.map(BigDecimal::new);
-        Optional<BigDecimal> htaxndBigDecimal = htaxnd.map(BigDecimal::new);
+        Optional<BigDecimal> amountBigDecimal = hamount.map(this::toBigDecimal);
+        Optional<BigDecimal> hcuramnBigDecimal = hcuramn.map(this::toBigDecimal);
+        Optional<BigDecimal> hbaseBigDecimal = hbase.map(this::toBigDecimal);
+        Optional<BigDecimal> htaxBigDecimal = htax.map(this::toBigDecimal);
+        Optional<BigDecimal> htaxndBigDecimal = htaxnd.map(this::toBigDecimal);
 
         BobAccountHistoryEntry accountingEntry = new BobAccountHistoryEntry();
         accountingEntry.setHid(hid);
@@ -97,5 +98,9 @@ public class BobAccountHistoryEntryRecordReader {
         accountingEntry.setChkdigit(chkdigit.orElse(null));
         accountingEntry.setHvatmode(hvatmode.orElse(null));
         return accountingEntry;
+    }
+
+    private BigDecimal toBigDecimal(double doubleValue) {
+        return new BigDecimal(doubleValue).setScale(3, RoundingMode.HALF_UP);
     }
 }

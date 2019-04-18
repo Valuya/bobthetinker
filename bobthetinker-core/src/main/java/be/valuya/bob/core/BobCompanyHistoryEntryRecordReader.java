@@ -3,6 +3,7 @@ package be.valuya.bob.core;
 import be.valuya.advantaje.core.AdvantajeRecord;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -58,11 +59,11 @@ public class BobCompanyHistoryEntryRecordReader {
         Optional<String> hsuppdocno = advantajeRecord.getValueOptional("HSUPPDOCNO"); //: (STRING, 20):
 
 
-        Optional<BigDecimal> hDisAmountBigDecimal = hdisamount.map(BigDecimal::new);
-        Optional<BigDecimal> hcuramnBigDecimal = hcuramn.map(BigDecimal::new);
-        Optional<BigDecimal> hAmountBigDecimal = hamount.map(BigDecimal::new);
-        Optional<BigDecimal> hbaseBigDecimal = hbase.map(BigDecimal::new);
-        Optional<BigDecimal> htaxBigDecimal = htax.map(BigDecimal::new);
+        Optional<BigDecimal> hDisAmountBigDecimal = hdisamount.map(this::toBigDecimal);
+        Optional<BigDecimal> hcuramnBigDecimal = hcuramn.map(this::toBigDecimal);
+        Optional<BigDecimal> hAmountBigDecimal = hamount.map(this::toBigDecimal);
+        Optional<BigDecimal> hbaseBigDecimal = hbase.map(this::toBigDecimal);
+        Optional<BigDecimal> htaxBigDecimal = htax.map(this::toBigDecimal);
 
         BobCompanyHistoryEntry historyEntry = new BobCompanyHistoryEntry();
 
@@ -112,5 +113,10 @@ public class BobCompanyHistoryEntryRecordReader {
         historyEntry.setHmanualpay(hmanualpay);
         historyEntry.setHsuppdocno(hsuppdocno);
         return historyEntry;
+    }
+
+
+    private BigDecimal toBigDecimal(double doubleValue) {
+        return new BigDecimal(doubleValue).setScale(3, RoundingMode.HALF_UP);
     }
 }

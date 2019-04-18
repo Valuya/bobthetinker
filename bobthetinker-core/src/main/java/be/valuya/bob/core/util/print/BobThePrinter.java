@@ -51,8 +51,10 @@ public class BobThePrinter {
         String accountStr = accountOptional.map(ATAccount::getName).orElse(ABSENT_PLACEHOLDER);
         String accountCode = accountOptional.map(ATAccount::getCode).orElse(ABSENT_PLACEHOLDER);
         String dbkCode = accountingEntry.getDbkCode();
-        String message = MessageFormat.format("accounting entry: [{4}] {0}, account {3} ({2}), {1} €",
-                date, amount, accountStr, accountCode, dbkCode);
+        String periodName = accountingEntry.getBookPeriod().getName();
+        String yearName = accountingEntry.getBookPeriod().getBookYear().getName();
+        String message = MessageFormat.format("accounting entry: [{4}] {0} ({5} {6}), account {3} ({2}), {1} €",
+                date, amount, accountStr, accountCode, dbkCode, periodName, yearName);
         System.out.println(message);
     }
 

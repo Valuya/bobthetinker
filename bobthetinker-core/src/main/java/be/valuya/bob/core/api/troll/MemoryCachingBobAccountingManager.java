@@ -21,6 +21,7 @@ import be.valuya.bob.core.BobPeriod;
 import be.valuya.bob.core.BobTheTinker;
 
 import java.math.BigDecimal;
+import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoField;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,6 +41,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private static final Comparator<BobPeriod> BOB_PERIOD_COMPARATOR = Comparator.comparing(BobPeriod::getfYear)
             .thenComparing(BobPeriod::getYear)
             .thenComparing(BobPeriod::getMonth);
+
     private final BobTheTinker bobTheTinker;
 
     private final BobFileConfiguration bobFileConfiguration;
@@ -69,11 +72,13 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         // Seems periods are grouped by the 'fYear' field which can span more than 1 civil year.
         return bobTheTinker.readPeriods(bobFileConfiguration)
                 .sorted(BOB_PERIOD_COMPARATOR)
+                .filter(isValidBookYearPeriod())
                 .collect(Collectors.groupingBy(BobPeriod::getfYear))
                 .entrySet()
                 .stream()
                 .map(entry -> this.convertToTrollBookYear(entry.getKey(), entry.getValue()));
     }
+
 
     @Override
     public Stream<ATBookPeriod> streamPeriods() {
@@ -86,7 +91,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     public Stream<ATThirdParty> streamThirdParties() {
         return bobTheTinker.readCompanies(bobFileConfiguration)
                 .filter(this::isValidCompany)
-                .map(this::convertToTrollThirdParty);
+                .flatMap(this::convertToTrollThirdParties);
     }
 
     @Override
@@ -106,20 +111,23 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private boolean isValidAccount(BobAccount bobAccount) {
         String aid = bobAccount.getAid();
-        return aid != null && !aid.trim().isEmpty();
+        return aid != null && isNotEmptyString(aid.trim());
     }
 
     private boolean isValidCompany(BobCompany bobCompany) {
         String cid = bobCompany.getcId();
         Optional<String> name1Optional = bobCompany.getcName1Optional();
-        return cid != null && !cid.trim().isEmpty() && name1Optional.isPresent();
+        return cid != null && isNotEmptyString(cid.trim()) && name1Optional.isPresent();
     }
 
     private boolean isValidPeriod(BobPeriod bobPeriod) {
         String label = bobPeriod.getLabel();
-        return label != null && !label.trim().isEmpty();
+        return label != null && isNotEmptyString(label.trim());
     }
 
+    private Predicate<BobPeriod> isValidBookYearPeriod() {
+        return p -> p.getMonth() > 0;
+    }
 
     private boolean isValidHistoryEntry(BobAccountHistoryEntry historyEntry) {
         String hid = historyEntry.getHid();
@@ -127,7 +135,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         Optional<Integer> hyearOptional = historyEntry.getHyearOptional();
         Optional<String> hdbkOptional = historyEntry.getHdbkOptional();
         Optional<BigDecimal> hamountOptional = historyEntry.getHamountOptional();
-        return hid != null && !hid.trim().isEmpty()
+        return hid != null && isNotEmptyString(hid.trim())
                 && hmonthOptional.isPresent()
                 && hyearOptional.isPresent()
                 && hdbkOptional.isPresent()
@@ -141,9 +149,9 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         String htype = historyEntry.getHtype();
         String hfyear = historyEntry.getHfyear();
         Optional<String> hdbkOptional = historyEntry.getHdbk();
-        return hid != null && !hid.trim().isEmpty()
-                && htype != null && !htype.trim().isEmpty()
-                && hfyear != null && !hfyear.trim().isEmpty()
+        return hid != null && isNotEmptyString(hid.trim())
+                && htype != null && isNotEmptyString(htype.trim())
+                && hfyear != null && isNotEmptyString(hfyear.trim())
                 && hdbkOptional.isPresent()
                 ;
     }
@@ -167,10 +175,17 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     private ATAccount createAccount(String accountNumber, String name) {
+        boolean yearResetAccount = isYearResetAccount(accountNumber);
+
         ATAccount account = new ATAccount();
         account.setCode(accountNumber);
         account.setName(name);
+        account.setYearlyBalanceReset(yearResetAccount);
         return account;
+    }
+
+    private boolean isYearResetAccount(String accountCode) {
+        return accountCode.startsWith("6") || accountCode.startsWith("7");
     }
 
     private ATBookYear convertToTrollBookYear(String fYear, List<BobPeriod> periods) {
@@ -204,7 +219,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         ATPeriodType periodType;
         if (month == 0) {
             periodStartDate = bookYear.getStartDate();
-            periodEndDate = bookYear.getEndDate();
+            periodEndDate = periodStartDate.plusMonths(1); // FIXME: to mimic winbooks, but might not be monthly periods
             periodType = ATPeriodType.OPENING; // Its a wildcard period apparently covering the book year
         } else {
             periodStartDate = getPeriodStartDate(bobPeriod);
@@ -222,28 +237,32 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
 
-    private ATThirdParty convertToTrollThirdParty(BobCompany bobCompany) {
+    private Stream<ATThirdParty> convertToTrollThirdParties(BobCompany bobCompany) {
         // A single company for both client/suppliers, while a thirdparty has a single purpose
-        Optional<String> vatNumberOptional = bobCompany.getcVatNumberOptional()
-                .map(Optional::of)
-                .orElseGet(bobCompany::getsVatNumberOptional);
+        Optional<String> cVatNumberOptional = bobCompany.getcVatNumberOptional();
+        Optional<String> sVatNumberOptional = bobCompany.getsVatNumberOptional();
 
-        ATThirdParty thirdParty = createBaseThirdParty(bobCompany);
-        thirdParty.setType(ATThirdPartyType.CLIENT);
-        thirdParty.setVatNumber(vatNumberOptional.orElse(null));
-        return thirdParty;
+        ATThirdParty clientThirdParty = createBaseThirdParty(bobCompany);
+        clientThirdParty.setType(ATThirdPartyType.CLIENT);
+        cVatNumberOptional.ifPresent(clientThirdParty::setVatNumber);
+
+        ATThirdParty supplierThirdParty = createBaseThirdParty(bobCompany);
+        supplierThirdParty.setType(ATThirdPartyType.SUPPLIER);
+        sVatNumberOptional.ifPresent(supplierThirdParty::setVatNumber);
+
+        return Stream.of(clientThirdParty, supplierThirdParty);
     }
 
     private ATThirdParty createBaseThirdParty(BobCompany bobCompany) {
         String id = bobCompany.getcId();
-        Optional<String> fullName = bobCompany.getcName1Optional();
-        Optional<String> address = bobCompany.getcAddress1Optional();
-        Optional<String> zipCode = bobCompany.getcZipCodeOptional();
-        Optional<String> city = bobCompany.getcLocalityOptional();
-        Optional<String> countryCode = bobCompany.getcCountryCodeOptional();
-        Optional<String> phoneNumber = bobCompany.getcPhoneNumberOptional();
-        Optional<String> bankAccount = bobCompany.getcBankNumberOptional();
-        Optional<String> languageOptional = bobCompany.getcLanguageOptional();
+        Optional<String> fullName = bobCompany.getcName1Optional().filter(this::isNotEmptyString);
+        Optional<String> address = bobCompany.getcAddress1Optional().filter(this::isNotEmptyString);
+        Optional<String> zipCode = bobCompany.getcZipCodeOptional().filter(this::isNotEmptyString);
+        Optional<String> city = bobCompany.getcLocalityOptional().filter(this::isNotEmptyString);
+        Optional<String> countryCode = bobCompany.getcCountryCodeOptional().filter(this::isNotEmptyString);
+        Optional<String> phoneNumber = bobCompany.getcPhoneNumberOptional().filter(this::isNotEmptyString);
+        Optional<String> bankAccount = bobCompany.getcBankNumberOptional().filter(this::isNotEmptyString);
+        Optional<String> languageOptional = bobCompany.getcLanguageOptional().filter(this::isNotEmptyString);
 
         ATThirdParty baseThirdParty = new ATThirdParty();
         baseThirdParty.setId(id);
@@ -256,6 +275,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         baseThirdParty.setBankAccountNumber(bankAccount.orElse(null));
         baseThirdParty.setLanguage(languageOptional.orElse(null));
         return baseThirdParty;
+    }
+
+    private boolean isNotEmptyString(String s) {
+        return !s.trim().isEmpty();
     }
 
     private ATAccountingEntry convertToTrollAccountingEntry(BobAccountHistoryEntry entry) {
@@ -276,7 +299,11 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         Optional<ATAccount> accountOptional = this.findAccountByCode(accountNumber);
 
         Optional<String> thirdPartyName = entry.getHcussupOptional();
-        Optional<ATThirdParty> thirdPartyOptional = thirdPartyName.flatMap(this::findThirdPartyById);
+        ATThirdPartyType thirdPartyType = entry.getHcstypeOptional()
+                .flatMap(this::parseThirdPartyTypeFromHSType)
+                .orElse(ATThirdPartyType.CLIENT);
+        Optional<ATThirdParty> thirdPartyOptional = thirdPartyName
+                .flatMap(name -> this.findThirdPartyByIdAndType(name, thirdPartyType));
 
         LocalDate entryDate = entry.getHdocdateOptional().orElseThrow(() -> new BobException("No date for entry"));
         Optional<LocalDate> documentDateOptional = entry.getHdocdateOptional();
@@ -321,7 +348,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .flatMap(this::findAccountByCode);
 
         String hid = entry.getHid();
-        Optional<ATThirdParty> thirdPartyOptional = this.findThirdPartyById(hid);
+        Optional<ATThirdParty> thirdPartyOptional = this.findThirdPartyByIdAndType(hid, ATThirdPartyType.CLIENT);// FIXME: client or suppplier?
 
         LocalDate entryDate = entry.getHdocdate().orElseThrow(() -> new BobException("No date for entry"));
         Optional<LocalDate> documentDateOptional = entry.getHdocdate();
@@ -352,6 +379,18 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return accountingEntry;
     }
 
+    private Optional<ATThirdPartyType> parseThirdPartyTypeFromHSType(String hsType) {
+        switch (hsType) {
+            case "":
+                return Optional.empty();
+            case "S":
+                return Optional.of(ATThirdPartyType.SUPPLIER);
+            default:
+                throw new BobException("Unhandled hsType: " + hsType);
+        }
+    }
+
+
     private boolean isSameBookYearPeriod(ATBookPeriod bookPeriod, BobAccountHistoryEntry accountingEntry) {
         int year = accountingEntry.getHyearOptional().orElseThrow(() -> new BobException("No year set in entry"));
         int month = accountingEntry.getHmonthOptional().orElseThrow(() -> new BobException("No month set in entry"));
@@ -367,6 +406,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private boolean isSamePeriod(ATBookPeriod bookPeriod, int year, int month) {
         if (month == 0) {
             return bookPeriod.getPeriodType() == ATPeriodType.OPENING;
+        } else {
+            if (bookPeriod.getPeriodType() != ATPeriodType.GENERAL) {
+                return false;
+            }
         }
         LocalDate startDate = bookPeriod.getStartDate();
         int periodYear = startDate.get(ChronoField.YEAR);
@@ -389,48 +432,59 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
 
-    public List<ATBookYear> listBookYears() {
+    private List<ATBookYear> listBookYears() {
         return new ArrayList<>(getBookYears().values());
     }
 
-    public List<ATBookPeriod> listPeriods() {
+    private List<ATBookPeriod> listPeriods() {
         return getBookPeriods().values()
                 .stream()
                 .flatMap(Collection::stream)
                 .collect(Collectors.toList());
     }
 
-    public List<ATBookPeriod> listYearPeriods(ATBookYear bookYear) {
+    private List<ATBookPeriod> listYearPeriods(ATBookYear bookYear) {
         List<ATBookPeriod> periodsNullable = getBookPeriods().get(bookYear);
         return Optional.ofNullable(periodsNullable).orElseGet(ArrayList::new);
     }
 
-    public Optional<ATBookYear> findBookYearByName(String name) {
+    private Optional<ATBookYear> findBookYearByName(String name) {
         ATBookYear bookYearNullable = getBookYears().get(name);
         return Optional.ofNullable(bookYearNullable);
     }
 
-    public Optional<ATBookPeriod> findPeriodByName(ATBookYear bookYear, String name) {
+    private Optional<ATBookPeriod> findPeriodByName(ATBookYear bookYear, String name) {
         List<ATBookPeriod> bookYearPeriods = getBookPeriods().get(bookYear);
         return bookYearPeriods.stream()
                 .filter(p -> p.getName().equals(name))
                 .findAny();
     }
 
-    public ATAccount findOrCreateAccountByCode(String code) {
+    private ATAccount findOrCreateAccountByCode(String code) {
         ATAccount accountNullable = getAccounts().get(code);
         return Optional.ofNullable(accountNullable)
                 .orElseGet(() -> createAccount(code, "<ABSENT_FROM_ACCOUNT_TABLE>"));
     }
 
-    public Optional<ATAccount> findAccountByCode(String code) {
+    private Optional<ATAccount> findAccountByCode(String code) {
         ATAccount accountNullable = getAccounts().get(code);
         return Optional.ofNullable(accountNullable);
     }
 
-    public Optional<ATThirdParty> findThirdPartyById(String id) {
-        ATThirdParty thirdPartyNullable = getThirdParties().get(id);
+    private Optional<ATThirdParty> findThirdPartyByIdAndType(String id, ATThirdPartyType type) {
+        String typedThirdPartyId = this.getTypedThirdPartyId(id, type);
+        ATThirdParty thirdPartyNullable = getThirdParties().get(typedThirdPartyId);
         return Optional.ofNullable(thirdPartyNullable);
+    }
+
+    private String getTypedThirdPartyId(String id, ATThirdPartyType type) {
+        return MessageFormat.format("{0}::{1}", type, id);
+    }
+
+    private String getTypedThirdPartyId(ATThirdParty thirdParty) {
+        String id = thirdParty.getId();
+        ATThirdPartyType type = thirdParty.getTypeOptional().orElse(ATThirdPartyType.CLIENT);
+        return getTypedThirdPartyId(id, type);
     }
 
 
@@ -490,7 +544,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private void readThirdParties() {
         this.thirdParties = streamThirdParties()
                 .collect(Collectors.toMap(
-                        ATThirdParty::getId,
+                        this::getTypedThirdPartyId,
                         Function.identity()
                 ));
     }
