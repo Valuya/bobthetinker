@@ -18,7 +18,8 @@ import be.valuya.bob.core.BobAccountHistoryEntry;
 import be.valuya.bob.core.BobCompany;
 import be.valuya.bob.core.BobCompanyHistoryEntry;
 import be.valuya.bob.core.BobException;
-import be.valuya.bob.core.BobFileConfiguration;
+import be.valuya.bob.core.config.BalanceComputationMode;
+import be.valuya.bob.core.config.BobFileConfiguration;
 import be.valuya.bob.core.BobPeriod;
 import be.valuya.bob.core.BobTheTinker;
 
@@ -190,23 +191,27 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private Stream<ATAccountingEntry> convertWithBalanceCheck(BobAccountHistoryEntry entry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
         ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
 
-        boolean ignoreOpeningPeriodBalances = bobFileConfiguration.isIgnoreOpeningPeriodBalances();
-        if (ignoreOpeningPeriodBalances) {
-            return this.checkBalanceChangeIgnoringOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
-        } else {
-            return this.checkBalanceChangeResettingOnOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
+        BalanceComputationMode balanceComputationMode = bobFileConfiguration.getBalanceComputationMode();
+        switch (balanceComputationMode) {
+            case BOOK_YEAR_ENTRIES_ONLY:
+                return this.checkBalanceResetingOnNewBookYear(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
+            case IGNORE_OPENINGS_FOR_INTERMEDIATE_YEARS:
+                return this.checkBalanceChangeIgnoringIntermediateOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
+            default:
+                throw new BobException("Unhandled balance computation mode: " + balanceComputationMode);
         }
     }
 
-    private Stream<ATAccountingEntry> checkBalanceChangeResettingOnOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
+    private Stream<ATAccountingEntry> checkBalanceResetingOnNewBookYear(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
         ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
         ATPeriodType periodType = bookPeriod.getPeriodType();
 
+        Optional<AccountBalance> currentBalance = getResettedBalanceOnBookYearChange(atAccountingEntry, balancesPerAccountCode);
         AccountBalance newBalance;
         if (periodType == ATPeriodType.OPENING) {
             newBalance = resetAccountBalance(atAccountingEntry, balancesPerAccountCode);
         } else {
-            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode);
+            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode, currentBalance);
         }
         BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(newBalance, Optional.of(atAccountingEntry));
         accountingEventListener.handleBalanceChangeEvent(balanceChangeEvent);
@@ -214,7 +219,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return Stream.of(atAccountingEntry);
     }
 
-    private Stream<ATAccountingEntry> checkBalanceChangeIgnoringOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
+    private Stream<ATAccountingEntry> checkBalanceChangeIgnoringIntermediateOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
         ATAccount atAccount = atAccountingEntry.getAccount();
         String accountCode = atAccount.getCode();
         ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
@@ -673,31 +678,47 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
 
     private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
+        Optional<AccountBalance> yearlyAdjustedAccountBalanceOptional = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode);
+        return updateAccountBalanceAfterAccountingEntry(accountingEntry, balancesPerAccountCode, yearlyAdjustedAccountBalanceOptional);
+    }
+
+    private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode, Optional<AccountBalance> currentBalanceOptional) {
         BigDecimal entryAmount = accountingEntry.getAmount();
-        BigDecimal newBalance = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode)
+        LocalDate date = accountingEntry.getDate();
+        BigDecimal newBalance = currentBalanceOptional
                 .map(AccountBalance::getBalance)
                 .map(entryAmount::add)
                 .orElse(entryAmount);
-        LocalDate date = accountingEntry.getDate();
-
         AccountBalance newAccountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, newBalance);
         return newAccountBalance;
     }
 
-
     private Optional<AccountBalance> getYearlyAdjustedAccountBalanceOptional(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
         ATAccount account = accountingEntry.getAccount();
         String accountCode = account.getCode();
+        boolean yearlyBalanceReset = account.isYearlyBalanceReset();
         AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
-        return Optional.ofNullable(accountBalanceNullable)
-                .map(accountBalance -> getAdjustedBalance(accountBalance, accountingEntry));
+        Optional<AccountBalance> accountBalanceOptional = Optional.ofNullable(accountBalanceNullable);
+
+        if (!yearlyBalanceReset) {
+            return accountBalanceOptional;
+        } else {
+            return accountBalanceOptional
+                    .map(accountBalance -> getResettedBalanceOnBookYearChange(accountBalance, accountingEntry));
+        }
     }
 
-    private AccountBalance getAdjustedBalance(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
+    private Optional<AccountBalance> getResettedBalanceOnBookYearChange(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
+        ATAccount account = accountingEntry.getAccount();
+        String accountCode = account.getCode();
+        AccountBalance curBalanceNullable = balancesPerAccountCode.get(accountCode);
+        Optional<AccountBalance> accountBalanceOptional = Optional.ofNullable(curBalanceNullable);
+        return accountBalanceOptional
+                .map(balance -> getResettedBalanceOnBookYearChange(balance, accountingEntry));
+    }
+
+    private AccountBalance getResettedBalanceOnBookYearChange(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
         ATAccount account = accountBalance.getAccount();
-        if (!account.isYearlyBalanceReset()) {
-            return accountBalance;
-        }
         if (isSameBookYear(accountBalance, accountingEntry)) {
             return accountBalance;
         } else {

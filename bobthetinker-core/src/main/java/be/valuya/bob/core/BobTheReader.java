@@ -1,7 +1,6 @@
 package be.valuya.bob.core;
 
-import be.valuya.advantaje.core.AdvantajeService;
-import be.valuya.advantaje.core.AdvantajeTableMetaData;
+import be.valuya.bob.core.config.BobFileConfiguration;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

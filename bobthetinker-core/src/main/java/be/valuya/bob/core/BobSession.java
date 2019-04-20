@@ -1,5 +1,7 @@
 package be.valuya.bob.core;
 
+import be.valuya.bob.core.config.BobFileConfiguration;
+
 public class BobSession {
 
     private final BobFileConfiguration bobFileConfiguration;

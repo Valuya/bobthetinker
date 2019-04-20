@@ -1,10 +1,9 @@
 package be.valuya.bob.core.api.troll;
 
-import be.valuya.bob.core.BobFileConfiguration;
+import be.valuya.bob.core.config.BobFileConfiguration;
 import be.valuya.bob.core.test.categories.LocalDev;
 import be.valuya.bob.core.util.print.BobThePrinter;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;

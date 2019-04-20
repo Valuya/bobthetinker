@@ -1,6 +1,7 @@
 package be.valuya.bob.core;
 
 import be.valuya.advantaje.core.AdvantajeService;
+import be.valuya.bob.core.config.BobFileConfiguration;
 
 import java.io.IOException;
 import java.io.InputStream;
