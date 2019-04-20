@@ -11,6 +11,7 @@ import be.valuya.accountingtroll.domain.ATPeriodType;
 import be.valuya.accountingtroll.domain.ATTax;
 import be.valuya.accountingtroll.domain.ATThirdParty;
 import be.valuya.accountingtroll.domain.ATThirdPartyType;
+import be.valuya.accountingtroll.event.BalanceChangeEvent;
 import be.valuya.bob.core.BobAccount;
 import be.valuya.bob.core.BobAccountHistoryEntry;
 import be.valuya.bob.core.BobCompany;
@@ -21,6 +22,7 @@ import be.valuya.bob.core.BobPeriod;
 import be.valuya.bob.core.BobTheTinker;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,12 +33,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class MemoryCachingBobAccountingManager implements AccountingManager {
+
+    private static final BigDecimal ZERO_EURO = BigDecimal.ZERO.setScale(3, RoundingMode.UNNECESSARY);
 
     private static final Comparator<BobPeriod> BOB_PERIOD_COMPARATOR = Comparator.comparing(BobPeriod::getfYear)
             .thenComparing(BobPeriod::getYear)
@@ -45,6 +50,8 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private final BobTheTinker bobTheTinker;
 
     private final BobFileConfiguration bobFileConfiguration;
+
+    // Caches
     private Map<String, ATBookYear> bookYears;
     private Map<ATBookYear, List<ATBookPeriod>> bookPeriods;
     private Map<String, ATAccount> accounts;
@@ -96,18 +103,54 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     @Override
     public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-        return bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
+        // Balance cache
+        Map<String, AccountBalance> balancesPerAccountCode = new ConcurrentSkipListMap<>();
+
+        Comparator<BobAccountHistoryEntry> wbEntryComparator = Comparator
+                .comparing((BobAccountHistoryEntry e) -> e.getHfyearOptional().orElse("")) //TODO: not optional
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHyearOptional().orElse(-1))
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHmmonthOptional().orElse(-1))
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHdocdateOptional().orElse(LocalDate.MIN))
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHordernoOptional().orElse(null), Comparator.nullsFirst(Comparator.naturalOrder())); // balance first
+
+
+        Stream<ATAccountingEntry> entryStream = bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
+                .sorted(wbEntryComparator)
                 .filter(this::isValidHistoryEntry)
-                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
+                .flatMap(entry -> convertWithBalanceCheck(entry, balancesPerAccountCode, accountingEventListener));
+
+        // Ensure all accounts with the yealryReset flag will fire a balance change event if relevant.
+        streamAccounts().filter(ATAccount::isYearlyBalanceReset)
+                .map(account -> this.createYearlyResetBalanceChangeEventOptional(account, balancesPerAccountCode))
+                .flatMap(this::streamOptional)
+                .forEach(accountingEventListener::handleBalanceChangeEvent);
+
+        return entryStream;
     }
 
-//
-//    @Override
-//    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-//        return bobTheTinker.readCompanyHistoryEntries(bobFileConfiguration)
-//                .filter(this::isValidHistoryEntry)
-//                .flatMap(entry -> convertWithBalanceCheck(entry, accountingEventListener));
-//    }
+
+    private Optional<BalanceChangeEvent> createYearlyResetBalanceChangeEventOptional(ATAccount atAccount, Map<String, AccountBalance> balancesPerAccountCode) {
+        ATBookPeriod lastBookYearOpening = streamPeriods().filter(p -> p.getPeriodType() == ATPeriodType.OPENING)
+                .reduce((c, n) -> n)
+                .orElseThrow(() -> new BobException("No period opening"));
+        LocalDate balanceResetDate = lastBookYearOpening.getStartDate();
+
+        String accountCode = atAccount.getCode();
+        AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
+
+        // If there is already a balance dated in this book year, skip
+        boolean hasValidBalance = Optional.ofNullable(accountBalanceNullable)
+                .filter(b -> !b.getDate().isBefore(balanceResetDate))
+                .isPresent();
+        if (hasValidBalance) {
+            return Optional.empty();
+        }
+
+        // Otherwise, reset balance to 0 and fire event
+        AccountBalance accountBalance = createAccountBalance(atAccount, balanceResetDate, lastBookYearOpening, ZERO_EURO);
+        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(accountBalance, Optional.empty());
+        return Optional.of(balanceChangeEvent);
+    }
 
     private boolean isValidAccount(BobAccount bobAccount) {
         String aid = bobAccount.getAid();
@@ -117,7 +160,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private boolean isValidCompany(BobCompany bobCompany) {
         String cid = bobCompany.getcId();
         Optional<String> name1Optional = bobCompany.getcName1Optional();
-        return cid != null && isNotEmptyString(cid.trim()) && name1Optional.isPresent();
+        return cid != null && isNotEmptyString(cid) && name1Optional.isPresent();
     }
 
     private boolean isValidPeriod(BobPeriod bobPeriod) {
@@ -143,27 +186,69 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 ;
     }
 
+    private Stream<ATAccountingEntry> convertWithBalanceCheck(BobAccountHistoryEntry entry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
+        ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
 
-    private boolean isValidHistoryEntry(BobCompanyHistoryEntry historyEntry) {
-        String hid = historyEntry.getHid();
-        String htype = historyEntry.getHtype();
-        String hfyear = historyEntry.getHfyear();
-        Optional<String> hdbkOptional = historyEntry.getHdbk();
-        return hid != null && isNotEmptyString(hid.trim())
-                && htype != null && isNotEmptyString(htype.trim())
-                && hfyear != null && isNotEmptyString(hfyear.trim())
-                && hdbkOptional.isPresent()
-                ;
+
+        boolean ignoreOpeningPeriodBalances = bobFileConfiguration.isIgnoreOpeningPeriodBalances();
+        if (ignoreOpeningPeriodBalances) {
+            return this.checkBalanceChangeIgnoringOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
+        } else {
+            return this.checkBalanceChangeResettingOnOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
+        }
     }
 
-    private Stream<ATAccountingEntry> convertWithBalanceCheck(BobAccountHistoryEntry entry, AccountingEventListener accountingEventListener) {
-        ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
+    private Stream<ATAccountingEntry> checkBalanceChangeResettingOnOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
+        ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
+        ATPeriodType periodType = bookPeriod.getPeriodType();
+
+        AccountBalance newBalance;
+        if (periodType == ATPeriodType.OPENING) {
+            newBalance = resetAccountBalance(atAccountingEntry, balancesPerAccountCode);
+        } else {
+            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode);
+        }
+        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(newBalance, Optional.of(atAccountingEntry));
+        accountingEventListener.handleBalanceChangeEvent(balanceChangeEvent);
+
         return Stream.of(atAccountingEntry);
     }
 
-    private Stream<ATAccountingEntry> convertWithBalanceCheck(BobCompanyHistoryEntry entry, AccountingEventListener accountingEventListener) {
-        ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
+    private Stream<ATAccountingEntry> checkBalanceChangeIgnoringOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
+        ATAccount atAccount = atAccountingEntry.getAccountOptional()
+                .orElseThrow(() -> new BobException("No account for entry"));
+        String accountCode = atAccount.getCode();
+        ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
+        ATPeriodType periodType = bookPeriod.getPeriodType();
+
+        AccountBalance curBalance = balancesPerAccountCode.get(accountCode);
+        AccountBalance newBalance;
+        if (curBalance == null) {
+            if (periodType != ATPeriodType.OPENING) {
+                // TODO: warn? Without any amount for the opening of the first book year, we have to assume it was 0
+            }
+            newBalance = resetAccountBalance(atAccountingEntry, balancesPerAccountCode);
+        } else if (periodType != ATPeriodType.OPENING) {
+            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode);
+        } else {
+            // Ignore
+            return Stream.empty();
+        }
+        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(newBalance, Optional.of(atAccountingEntry));
+        accountingEventListener.handleBalanceChangeEvent(balanceChangeEvent);
         return Stream.of(atAccountingEntry);
+    }
+
+
+    private BalanceChangeEvent createBalanceChangeEvent(AccountBalance newBalance, Optional<ATAccountingEntry> accountingEntryOptional) {
+        ATAccount account = newBalance.getAccount();
+        BigDecimal balanceAmount = newBalance.getBalance();
+
+        BalanceChangeEvent changeEvent = new BalanceChangeEvent();
+        changeEvent.setAccountingEntryOptional(accountingEntryOptional);
+        changeEvent.setAccount(account);
+        changeEvent.setNewBalance(balanceAmount);
+        return changeEvent;
     }
 
     private ATAccount convertToTrollAccount(BobAccount bobAccount) {
@@ -219,8 +304,9 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         ATPeriodType periodType;
         if (month == 0) {
             periodStartDate = bookYear.getStartDate();
-            periodEndDate = periodStartDate.plusMonths(1); // FIXME: to mimic winbooks, but might not be monthly periods
-            periodType = ATPeriodType.OPENING; // Its a wildcard period apparently covering the book year
+            // TODO: to mimic winbooks, but might not be monthly periods
+            periodEndDate = periodStartDate.plusMonths(1);
+            periodType = ATPeriodType.OPENING;
         } else {
             periodStartDate = getPeriodStartDate(bobPeriod);
             periodEndDate = getPeriodEndDate(bobPeriod);
@@ -303,6 +389,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .flatMap(this::parseThirdPartyTypeFromHSType)
                 .orElse(ATThirdPartyType.CLIENT);
         Optional<ATThirdParty> thirdPartyOptional = thirdPartyName
+                .filter(this::isNotEmptyString)
                 .flatMap(name -> this.findThirdPartyByIdAndType(name, thirdPartyType));
 
         LocalDate entryDate = entry.getHdocdateOptional().orElseThrow(() -> new BobException("No date for entry"));
@@ -547,5 +634,81 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                         this::getTypedThirdPartyId,
                         Function.identity()
                 ));
+    }
+
+
+    private AccountBalance resetAccountBalance(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
+        LocalDate date = accountingEntry.getDate();
+        BigDecimal amount = accountingEntry.getAmount();
+
+        AccountBalance accountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, amount);
+        return accountBalance;
+    }
+
+    private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
+        BigDecimal entryAmount = accountingEntry.getAmount();
+        BigDecimal newBalance = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode)
+                .map(AccountBalance::getBalance)
+                .map(entryAmount::add)
+                .orElse(entryAmount);
+        LocalDate date = accountingEntry.getDate();
+
+        AccountBalance newAccountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, newBalance);
+        return newAccountBalance;
+    }
+
+    private Optional<AccountBalance> getYearlyAdjustedAccountBalanceOptional(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
+        ATAccount account = accountingEntry.getAccountOptional().orElseThrow(() -> new BobException("No account"));//TODO: non-optional
+        String accountCode = account.getCode();
+        AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
+        return Optional.ofNullable(accountBalanceNullable)
+                .map(accountBalance -> getAdjustedBalance(accountBalance, accountingEntry));
+    }
+
+    private AccountBalance getAdjustedBalance(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
+        ATAccount account = accountBalance.getAccount();
+        if (!account.isYearlyBalanceReset()) {
+            return accountBalance;
+        }
+        if (isSamePeriod(accountBalance, accountingEntry)) {
+            return accountBalance;
+        } else {
+            LocalDate date = accountingEntry.getDate();
+            ATBookPeriod bookPeriod = accountingEntry.getBookPeriod();
+            return createAccountBalance(account, date, bookPeriod, ZERO_EURO);
+        }
+    }
+
+
+    private boolean isSamePeriod(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
+        ATBookPeriod balancePeriod = accountBalance.getPeriod();
+        ATBookPeriod entryPeriod = accountingEntry.getBookPeriod();
+        return balancePeriod.equals(entryPeriod);
+    }
+
+    private AccountBalance createAccountBalance(ATAccount atAccount, LocalDate date, ATBookPeriod bookPeriod, BigDecimal newBalanceAmount) {
+        AccountBalance newBalance = new AccountBalance();
+        newBalance.setAccount(atAccount);
+        newBalance.setBalance(newBalanceAmount);
+        newBalance.setPeriod(bookPeriod);
+        newBalance.setDate(date);
+
+        return newBalance;
+    }
+
+    private AccountBalance setAccountBalance(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode, LocalDate date, BigDecimal amount) {
+        ATBookPeriod bookPeriod = accountingEntry.getBookPeriod();
+        ATAccount account = accountingEntry.getAccountOptional().orElseThrow(() -> new BobException("No account"));// TODO
+        String accountCode = account.getCode();
+
+        AccountBalance accountBalance = createAccountBalance(account, date, bookPeriod, amount);
+        balancesPerAccountCode.put(accountCode, accountBalance);
+        return accountBalance;
+    }
+
+
+    private <T> Stream<T> streamOptional(Optional<T> optionalValue) {
+        return optionalValue.map(Stream::of)
+                .orElseGet(Stream::empty);
     }
 }
