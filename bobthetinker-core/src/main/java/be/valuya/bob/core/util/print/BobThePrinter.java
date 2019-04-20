@@ -4,15 +4,15 @@ import be.valuya.accountingtroll.domain.ATAccount;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
+import be.valuya.accountingtroll.domain.ATDocument;
 import be.valuya.accountingtroll.domain.ATThirdParty;
 import be.valuya.accountingtroll.event.BalanceChangeEvent;
-import be.valuya.bob.core.BobCompany;
-import be.valuya.bob.core.BobPeriod;
+import be.valuya.bob.core.domain.BobCompany;
+import be.valuya.bob.core.domain.BobPeriod;
 
 import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.time.LocalDate;
-import java.util.Optional;
 
 public class BobThePrinter {
 
@@ -58,6 +58,21 @@ public class BobThePrinter {
 
         String message = MessageFormat.format("accounting entry: [{4} {7}] {0} ({5} {6}), account {3} ({2}), {1} €",
                 date, amount, accountStr, accountCode, dbkCode, periodName, yearName, docNumberString);
+        System.out.println(message);
+    }
+
+    public void printDocument(ATDocument document) {
+        String id = document.getId();
+        ATBookPeriod bookPeriod = document.getBookPeriod();
+        String dbkCode = document.getDbkCode();
+        int docNumber = document.getDocNumber();
+
+        String docNumberString = Integer.toString(docNumber);
+        String periodName = bookPeriod.getName();
+        String yearName = bookPeriod.getBookYear().getName();
+
+        String message = MessageFormat.format("document: [{0} {1}] ({2} {3}) {4}",
+                dbkCode, docNumberString, periodName, yearName, id);
         System.out.println(message);
     }
 

@@ -61,4 +61,9 @@ public class BobTrollAccountingServiceTest {
                 .forEach(bobThePrinter::printAccountingEntry);
     }
 
+    @Test
+    public void testStreamDocuments() {
+        bobAccountingManager.streamDocuments()
+                .forEach(bobThePrinter::printDocument);
+    }
 }

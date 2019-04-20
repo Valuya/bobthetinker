@@ -1,4 +1,4 @@
-package be.valuya.bob.core;
+package be.valuya.bob.core.domain;
 
 public class BobException extends RuntimeException {
     public BobException() {

@@ -2,6 +2,19 @@ package be.valuya.bob.core;
 
 import be.valuya.advantaje.core.AdvantajeService;
 import be.valuya.bob.core.config.BobFileConfiguration;
+import be.valuya.bob.core.domain.BobAccount;
+import be.valuya.bob.core.domain.BobAccountHistoryEntry;
+import be.valuya.bob.core.domain.BobCompany;
+import be.valuya.bob.core.domain.BobCompanyHistoryEntry;
+import be.valuya.bob.core.domain.BobDocument;
+import be.valuya.bob.core.domain.BobPeriod;
+import be.valuya.bob.core.reader.BobAccountHistoryEntryRecordReader;
+import be.valuya.bob.core.reader.BobAccountRecordReader;
+import be.valuya.bob.core.reader.BobCompanyHistoryEntryRecordReader;
+import be.valuya.bob.core.reader.BobCompanyRecordReader;
+import be.valuya.bob.core.reader.BobDocumentRecordReader;
+import be.valuya.bob.core.reader.BobPeriodRecordReader;
+import be.valuya.bob.core.reader.BobTheReader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,6 +49,7 @@ public class BobTheTinker {
     public static final String COMPANY_TABLE_NAME = "ac_compan";
     public static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
     public static final String COMPANY_HISTORY_TABLE_NAME = "ac_chisto";
+    public static final String DOCUMENTS_TABLE_NAME = "dm_invdoc";
 
     private static Logger LOGGER = Logger.getLogger(BobTheTinker.class.getName());
 
@@ -90,4 +104,10 @@ public class BobTheTinker {
                 .map(recordReader::readEntry);
     }
 
+    public Stream<BobDocument> readDocuments(BobFileConfiguration bobFileConfiguration) {
+        InputStream tableInputStream = bobTheReader.getTableInputStream(bobFileConfiguration, DOCUMENTS_TABLE_NAME);
+        BobDocumentRecordReader recordReader = new BobDocumentRecordReader();
+        return advantajeService.streamTable(tableInputStream)
+                .map(recordReader::readDocument);
+    }
 }

@@ -1,6 +1,7 @@
-package be.valuya.bob.core;
+package be.valuya.bob.core.reader;
 
 import be.valuya.bob.core.config.BobFileConfiguration;
+import be.valuya.bob.core.domain.BobException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

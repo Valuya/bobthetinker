@@ -1,6 +1,7 @@
-package be.valuya.bob.core;
+package be.valuya.bob.core.reader;
 
 import be.valuya.advantaje.core.AdvantajeRecord;
+import be.valuya.bob.core.domain.BobAccount;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

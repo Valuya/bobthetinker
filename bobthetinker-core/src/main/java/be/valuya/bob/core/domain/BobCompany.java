@@ -1,4 +1,4 @@
-package be.valuya.bob.core;
+package be.valuya.bob.core.domain;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

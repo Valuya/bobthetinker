@@ -1,4 +1,4 @@
-package be.valuya.bob.core;
+package be.valuya.bob.core.domain;
 
 import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
