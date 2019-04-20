@@ -23,6 +23,9 @@ public class BobAccount {
     private String aCat;
     private String aIntCat;
     private String aCatComm;
+    /**
+     * D or C depending on whether debit or credit account.
+     */
     private String adbcd;
 
     private Boolean aiscost; //: (LOGICAL, 1): [-]

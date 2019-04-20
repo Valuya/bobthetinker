@@ -25,13 +25,13 @@ public class BobAccountRecordReader {
         Optional<String> avattype = advantajeRecord.getValueOptional("AVATTYPE"); //: (STRING, 1):
         Optional<String> avatenat1 = advantajeRecord.getValueOptional("AVATENAT1"); //: (STRING, 3):
         Optional<String> avatenat2 = advantajeRecord.getValueOptional("AVATENAT2"); //: (STRING, 3):
-        Optional<BigDecimal> avatecmp = advantajeRecord.getValueOptional("AVATECMP"); //: (DOUBLE, 8): [-]
+        Optional<Double> avatecmp = advantajeRecord.getValueOptional("AVATECMP"); //: (DOUBLE, 8): [-]
         Optional<String> avatnnat1 = advantajeRecord.getValueOptional("AVATNNAT1"); //: (STRING, 3):
         Optional<String> avatnnat2 = advantajeRecord.getValueOptional("AVATNNAT2"); //: (STRING, 3):
-        Optional<BigDecimal> avatncmp = advantajeRecord.getValueOptional("AVATNCMP"); //: (DOUBLE, 8): [-]
+        Optional<Double> avatncmp = advantajeRecord.getValueOptional("AVATNCMP"); //: (DOUBLE, 8): [-]
         Optional<String> avatinat1 = advantajeRecord.getValueOptional("AVATINAT1"); //: (STRING, 3):
         Optional<String> avatinat2 = advantajeRecord.getValueOptional("AVATINAT2"); //: (STRING, 3):
-        Optional<BigDecimal> avaticmp = advantajeRecord.getValueOptional("AVATICMP"); //: (DOUBLE, 8): [-]
+        Optional<Double> avaticmp = advantajeRecord.getValueOptional("AVATICMP"); //: (DOUBLE, 8): [-]
         Optional<Boolean> aissummary = advantajeRecord.getValueOptional("AISSUMMARY"); //: (LOGICAL, 1): false
         Optional<Boolean> aisstatus = advantajeRecord.getValueOptional("AISSTATUS"); //: (LOGICAL, 1): [-]
         Optional<Boolean> aisreadonl = advantajeRecord.getValueOptional("AISREADONL"); //: (LOGICAL, 1): false
@@ -47,8 +47,8 @@ public class BobAccountRecordReader {
         Optional<Boolean> avatcas = advantajeRecord.getValueOptional("AVATCAS"); //: (LOGICAL, 1): [-]
         Optional<Boolean> acctsecondid = advantajeRecord.getValueOptional("ACCTSECONDID"); //: (LOGICAL, 1): [-]
         Optional<byte[]> amemo = advantajeRecord.getValueOptional("AMEMO"); //: (BINARY, 9): [B@3cda1055
-        Optional<BigDecimal> prcndcharges = advantajeRecord.getValueOptional("PRCNDCHARGES"); //: (DOUBLE, 8): 0.0
-        Optional<BigDecimal> prcprivate = advantajeRecord.getValueOptional("PRCPRIVATE"); //: (DOUBLE, 8): 0.0
+        Optional<Double> prcndcharges = advantajeRecord.getValueOptional("PRCNDCHARGES"); //: (DOUBLE, 8): 0.0
+        Optional<Double> prcprivate = advantajeRecord.getValueOptional("PRCPRIVATE"); //: (DOUBLE, 8): 0.0
         Optional<String> typendcharges = advantajeRecord.getValueOptional("TYPENDCHARGES"); //: (STRING, 12):
         Optional<String> createdby = advantajeRecord.getValueOptional("CREATEDBY"); //: (STRING, 10): LICOPPE
         Optional<LocalDateTime> createdon = advantajeRecord.getValueOptional("CREATEDON"); //: (TIMESTAMP, 8): 2017-01-18T14:04:14.595
@@ -73,6 +73,13 @@ public class BobAccountRecordReader {
         Optional<String> apcnid = advantajeRecord.getValueOptional("APCNID"); //: (STRING, 10):
 
 
+        Optional<BigDecimal> avatecmpOptional  = avatecmp.map(this::toBigDecimal);
+        Optional<BigDecimal> avatncmpOptional  = avatncmp.map(this::toBigDecimal);
+        Optional<BigDecimal> avaticmpOptional  = avaticmp.map(this::toBigDecimal);
+        Optional<BigDecimal> prcndchargesOptional  = prcndcharges.map(this::toBigDecimal);
+        Optional<BigDecimal> prcprivateOptional  = prcprivate.map(this::toBigDecimal);
+
+
         BobAccount bobAccount = new BobAccount();
         bobAccount.setAid(aid);
         bobAccount.setaIsTitle(aistitle.orElse(null));
@@ -90,13 +97,13 @@ public class BobAccountRecordReader {
         bobAccount.setAvattype(avattype.orElse(null));
         bobAccount.setAvatenat1(avatenat1.orElse(null));
         bobAccount.setAvatenat2(avatenat2.orElse(null));
-        bobAccount.setAvatecmp(avatecmp.orElse(null));
+        bobAccount.setAvatecmp(avatecmpOptional.orElse(null));
         bobAccount.setAvatnnat1(avatnnat1.orElse(null));
         bobAccount.setAvatnnat2(avatnnat2.orElse(null));
-        bobAccount.setAvatncmp(avatncmp.orElse(null));
+        bobAccount.setAvatncmp(avatncmpOptional.orElse(null));
         bobAccount.setAvatinat1(avatinat1.orElse(null));
         bobAccount.setAvatinat2(avatinat2.orElse(null));
-        bobAccount.setAvaticmp(avaticmp.orElse(null));
+        bobAccount.setAvaticmp(avaticmpOptional.orElse(null));
         bobAccount.setAissummary(aissummary.orElse(null));
         bobAccount.setAisstatus(aisstatus.orElse(null));
         bobAccount.setAisreadonl(aisreadonl.orElse(null));
@@ -112,8 +119,8 @@ public class BobAccountRecordReader {
         bobAccount.setAvatcas(avatcas.orElse(null));
         bobAccount.setAcctsecondid(acctsecondid.orElse(null));
         bobAccount.setAmemo(amemo.orElse(null));
-        bobAccount.setPrcndcharges(prcndcharges.orElse(null));
-        bobAccount.setPrcprivate(prcprivate.orElse(null));
+        bobAccount.setPrcndcharges(prcndchargesOptional.orElse(null));
+        bobAccount.setPrcprivate(prcprivateOptional.orElse(null));
         bobAccount.setTypendcharges(typendcharges.orElse(null));
         bobAccount.setCreatedby(createdby.orElse(null));
         bobAccount.setCreatedon(createdon.orElse(null));
@@ -137,5 +144,9 @@ public class BobAccountRecordReader {
         bobAccount.setAsynchro(asynchro.orElse(null));
         bobAccount.setApcnid(apcnid.orElse(null));
         return bobAccount;
+    }
+
+    private BigDecimal toBigDecimal(Double aDouble) {
+        return BigDecimal.valueOf(aDouble);
     }
 }

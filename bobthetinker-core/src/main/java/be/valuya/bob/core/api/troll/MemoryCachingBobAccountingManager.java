@@ -3,6 +3,7 @@ package be.valuya.bob.core.api.troll;
 import be.valuya.accountingtroll.AccountingEventListener;
 import be.valuya.accountingtroll.AccountingManager;
 import be.valuya.accountingtroll.domain.ATAccount;
+import be.valuya.accountingtroll.domain.ATAccountImputationType;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
@@ -106,16 +107,16 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         // Balance cache
         Map<String, AccountBalance> balancesPerAccountCode = new ConcurrentSkipListMap<>();
 
-        Comparator<BobAccountHistoryEntry> wbEntryComparator = Comparator
+        Comparator<BobAccountHistoryEntry> entryComparator = Comparator
                 .comparing((BobAccountHistoryEntry e) -> e.getHfyearOptional().orElse("")) //TODO: not optional
                 .thenComparing((BobAccountHistoryEntry e) -> e.getHyearOptional().orElse(-1))
-                .thenComparing((BobAccountHistoryEntry e) -> e.getHmmonthOptional().orElse(-1))
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHmonthOptional().orElse(-1))
                 .thenComparing((BobAccountHistoryEntry e) -> e.getHdocdateOptional().orElse(LocalDate.MIN))
-                .thenComparing((BobAccountHistoryEntry e) -> e.getHordernoOptional().orElse(null), Comparator.nullsFirst(Comparator.naturalOrder())); // balance first
+                .thenComparing((BobAccountHistoryEntry e) -> e.getHdocnoOptional().orElse(null), Comparator.nullsFirst(Comparator.naturalOrder())); // balance first
 
 
         Stream<ATAccountingEntry> entryStream = bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
-                .sorted(wbEntryComparator)
+                .sorted(entryComparator)
                 .filter(this::isValidHistoryEntry)
                 .flatMap(entry -> convertWithBalanceCheck(entry, balancesPerAccountCode, accountingEventListener));
 
@@ -189,7 +190,6 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private Stream<ATAccountingEntry> convertWithBalanceCheck(BobAccountHistoryEntry entry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
         ATAccountingEntry atAccountingEntry = convertToTrollAccountingEntry(entry);
 
-
         boolean ignoreOpeningPeriodBalances = bobFileConfiguration.isIgnoreOpeningPeriodBalances();
         if (ignoreOpeningPeriodBalances) {
             return this.checkBalanceChangeIgnoringOpeningPeriods(atAccountingEntry, balancesPerAccountCode, accountingEventListener);
@@ -215,8 +215,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     private Stream<ATAccountingEntry> checkBalanceChangeIgnoringOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
-        ATAccount atAccount = atAccountingEntry.getAccountOptional()
-                .orElseThrow(() -> new BobException("No account for entry"));
+        ATAccount atAccount = atAccountingEntry.getAccount();
         String accountCode = atAccount.getCode();
         ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
         ATPeriodType periodType = bookPeriod.getPeriodType();
@@ -244,6 +243,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         ATAccount account = accountBalance.getAccount();
         BigDecimal balanceAmount = accountBalance.getBalance();
         LocalDate balanceDate = accountBalance.getDate();
+        ATAccountImputationType imputationType = account.getImputationType();
 
         BalanceChangeEvent changeEvent = new BalanceChangeEvent();
         changeEvent.setAccount(account);
@@ -257,18 +257,28 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         String accountNumber = bobAccount.getAid();
         String name = bobAccount.getHeading1Optional()
                 .orElse("-");
-
-        return createAccount(accountNumber, name);
-    }
-
-    private ATAccount createAccount(String accountNumber, String name) {
         boolean yearResetAccount = isYearResetAccount(accountNumber);
+        ATAccountImputationType atAccountImputationType = bobAccount.getAdbcdOptional()
+                .map(this::createATAccountImputationType)
+                .orElseThrow(() -> new BobException("No debit/credit set on account " + accountNumber)); // TODO: required
 
         ATAccount account = new ATAccount();
         account.setCode(accountNumber);
         account.setName(name);
         account.setYearlyBalanceReset(yearResetAccount);
+        account.setImputationType(atAccountImputationType);
         return account;
+    }
+
+    private ATAccountImputationType createATAccountImputationType(String value) {
+        switch (value) {
+            case "D":
+                return ATAccountImputationType.DEBIT;
+            case "C":
+                return ATAccountImputationType.CREDIT;
+            default:
+                return ATAccountImputationType.UNKNOWN;
+        }
     }
 
     private boolean isYearResetAccount(String accountCode) {
@@ -381,10 +391,13 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
         String dbkCode = entry.getHdbkOptional().orElseThrow(() -> new BobException("No dbk entry for accounting entry"));
 
-        BigDecimal amount = entry.getHamountOptional().orElseThrow(() -> new BobException("No amount for entry"));
 
         String accountNumber = entry.getHid();
-        Optional<ATAccount> accountOptional = this.findAccountByCode(accountNumber);
+        ATAccount account = this.findAccountByCode(accountNumber)
+                .orElseThrow(() -> new BobException("No account found with code" + accountNumber));
+
+        BigDecimal amount = entry.getHamountOptional().orElseThrow(() -> new BobException("No amount for entry"));
+        BigDecimal signedAmount = getSignedAmount(account, amount);
 
         Optional<String> thirdPartyName = entry.getHcussupOptional();
         ATThirdPartyType thirdPartyType = entry.getHcstypeOptional()
@@ -398,6 +411,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         Optional<LocalDate> documentDateOptional = entry.getHdocdateOptional();
         Optional<LocalDate> dueDateOptional = entry.getHduedateOptional();
         Optional<String> commentOptional = entry.getHremOptional();
+        Integer docNumber = entry.getHdocnoOptional().orElse(-1);
 
         Optional<ATTax> taxOptional = Optional.empty(); //TODO
         Optional<ATDocument> documentOptional = Optional.empty(); // TODO
@@ -405,20 +419,26 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         ATAccountingEntry accountingEntry = new ATAccountingEntry();
         accountingEntry.setBookPeriod(bookPeriod);
         accountingEntry.setDate(entryDate);
-        accountingEntry.setAmount(amount);
+        accountingEntry.setAmount(signedAmount);
         accountingEntry.setDbkCode(dbkCode);
+        accountingEntry.setAccount(account);
+        accountingEntry.setDocNumber(docNumber);
 
-        accountingEntry.setAccountOptional(accountOptional);
         accountingEntry.setThirdPartyOptional(thirdPartyOptional);
         accountingEntry.setDocumentDateOptional(documentDateOptional);
         accountingEntry.setDueDateOptional(dueDateOptional);
         accountingEntry.setCommentOptional(commentOptional);
         accountingEntry.setTaxOptional(taxOptional);
         accountingEntry.setDocumentOptional(documentOptional);
-
         return accountingEntry;
     }
 
+
+    private BigDecimal getSignedAmount(ATAccount account, BigDecimal amount) {
+        // Amount are negated.
+        // We want positive amount for credit, negative for debit
+        return amount.negate();
+    }
 
     private ATAccountingEntry convertToTrollAccountingEntry(BobCompanyHistoryEntry entry) {
         String hfyear = entry.getHfyear();
@@ -433,8 +453,9 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         String hdbk = entry.getHdbk().orElseThrow(() -> new BobException("No dbk for entry"));
         BigDecimal amount = entry.getHamount().orElseThrow(() -> new BobException("No amount for entry"));
 
-        Optional<ATAccount> accountOptional = entry.getHcollectacc()
-                .flatMap(this::findAccountByCode);
+        ATAccount account = entry.getHcollectacc()
+                .flatMap(this::findAccountByCode)
+                .orElseThrow(() -> new BobException("No account found "));
 
         String hid = entry.getHid();
         Optional<ATThirdParty> thirdPartyOptional = this.findThirdPartyByIdAndType(hid, ATThirdPartyType.CLIENT);// FIXME: client or suppplier?
@@ -456,7 +477,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         accountingEntry.setDbkCode(hdbk);
         accountingEntry.setMatched(hmatchno.isPresent());
 
-        accountingEntry.setAccountOptional(accountOptional);
+        accountingEntry.setAccount(account);
         accountingEntry.setThirdPartyOptional(thirdPartyOptional);
         accountingEntry.setDocumentDateOptional(documentDateOptional);
         accountingEntry.setDueDateOptional(dueDateOptional);
@@ -474,8 +495,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 return Optional.empty();
             case "S":
                 return Optional.of(ATThirdPartyType.SUPPLIER);
+            case "C":
+                return Optional.of(ATThirdPartyType.CLIENT);
             default:
-                throw new BobException("Unhandled hsType: " + hsType);
+                throw new BobException("Unhandled hcsType: " + hsType);
         }
     }
 
@@ -547,12 +570,6 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return bookYearPeriods.stream()
                 .filter(p -> p.getName().equals(name))
                 .findAny();
-    }
-
-    private ATAccount findOrCreateAccountByCode(String code) {
-        ATAccount accountNullable = getAccounts().get(code);
-        return Optional.ofNullable(accountNullable)
-                .orElseGet(() -> createAccount(code, "<ABSENT_FROM_ACCOUNT_TABLE>"));
     }
 
     private Optional<ATAccount> findAccountByCode(String code) {
@@ -643,9 +660,17 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         LocalDate date = accountingEntry.getDate();
         BigDecimal amount = accountingEntry.getAmount();
 
-        AccountBalance accountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, amount);
+        // For a single period opening, we might have multiple entries for a single account: one debit, one credit for instance.
+        BigDecimal newBalance = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode)
+                .filter(balance -> isSamePeriod(balance, accountingEntry))
+                .map(AccountBalance::getBalance)
+                .map(amount::add)
+                .orElse(amount);
+
+        AccountBalance accountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, newBalance);
         return accountBalance;
     }
+
 
     private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
         BigDecimal entryAmount = accountingEntry.getAmount();
@@ -659,8 +684,9 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return newAccountBalance;
     }
 
+
     private Optional<AccountBalance> getYearlyAdjustedAccountBalanceOptional(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
-        ATAccount account = accountingEntry.getAccountOptional().orElseThrow(() -> new BobException("No account"));//TODO: non-optional
+        ATAccount account = accountingEntry.getAccount();
         String accountCode = account.getCode();
         AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
         return Optional.ofNullable(accountBalanceNullable)
@@ -672,7 +698,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         if (!account.isYearlyBalanceReset()) {
             return accountBalance;
         }
-        if (isSamePeriod(accountBalance, accountingEntry)) {
+        if (isSameBookYear(accountBalance, accountingEntry)) {
             return accountBalance;
         } else {
             LocalDate date = accountingEntry.getDate();
@@ -688,6 +714,15 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return balancePeriod.equals(entryPeriod);
     }
 
+
+    private boolean isSameBookYear(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
+        ATBookPeriod balancePeriod = accountBalance.getPeriod();
+        ATBookYear balanceBookYear = balancePeriod.getBookYear();
+        ATBookPeriod entryPeriod = accountingEntry.getBookPeriod();
+        ATBookYear entryBookyear = entryPeriod.getBookYear();
+        return balanceBookYear.equals(entryBookyear);
+    }
+
     private AccountBalance createAccountBalance(ATAccount atAccount, LocalDate date, ATBookPeriod bookPeriod, BigDecimal newBalanceAmount) {
         AccountBalance newBalance = new AccountBalance();
         newBalance.setAccount(atAccount);
@@ -700,7 +735,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private AccountBalance setAccountBalance(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode, LocalDate date, BigDecimal amount) {
         ATBookPeriod bookPeriod = accountingEntry.getBookPeriod();
-        ATAccount account = accountingEntry.getAccountOptional().orElseThrow(() -> new BobException("No account"));// TODO
+        ATAccount account = accountingEntry.getAccount();
         String accountCode = account.getCode();
 
         AccountBalance accountBalance = createAccountBalance(account, date, bookPeriod, amount);

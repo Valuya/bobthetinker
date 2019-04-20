@@ -17,7 +17,7 @@ public class TestAccountingEventListener implements AccountingEventListener {
 
     @Override
     public void handleBalanceChangeEvent(BalanceChangeEvent balanceChangeEvent) {
-        bobThePrinter.printBalanceChangeEvent(balanceChangeEvent);
+//        bobThePrinter.printBalanceChangeEvent(balanceChangeEvent);
     }
 
     @Override

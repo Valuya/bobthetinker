@@ -47,14 +47,17 @@ public class BobThePrinter {
     public void printAccountingEntry(ATAccountingEntry accountingEntry) {
         LocalDate date = accountingEntry.getDate();
         BigDecimal amount = accountingEntry.getAmount();
-        Optional<ATAccount> accountOptional = accountingEntry.getAccountOptional();
-        String accountStr = accountOptional.map(ATAccount::getName).orElse(ABSENT_PLACEHOLDER);
-        String accountCode = accountOptional.map(ATAccount::getCode).orElse(ABSENT_PLACEHOLDER);
+        ATAccount account = accountingEntry.getAccount();
+        String accountStr = account.getName();
+        String accountCode = account.getCode();
         String dbkCode = accountingEntry.getDbkCode();
         String periodName = accountingEntry.getBookPeriod().getName();
         String yearName = accountingEntry.getBookPeriod().getBookYear().getName();
-        String message = MessageFormat.format("accounting entry: [{4}] {0} ({5} {6}), account {3} ({2}), {1} €",
-                date, amount, accountStr, accountCode, dbkCode, periodName, yearName);
+        int docNumber = accountingEntry.getDocNumber();
+        String docNumberString = Integer.toString(docNumber);
+
+        String message = MessageFormat.format("accounting entry: [{4} {7}] {0} ({5} {6}), account {3} ({2}), {1} €",
+                date, amount, accountStr, accountCode, dbkCode, periodName, yearName, docNumberString);
         System.out.println(message);
     }
 
