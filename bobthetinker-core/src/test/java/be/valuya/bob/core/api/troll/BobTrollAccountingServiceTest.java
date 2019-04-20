@@ -3,14 +3,17 @@ package be.valuya.bob.core.api.troll;
 import be.valuya.bob.core.config.BobFileConfiguration;
 import be.valuya.bob.core.test.categories.LocalDev;
 import be.valuya.bob.core.util.print.BobThePrinter;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 
 @Category(LocalDev.class)
 @RunWith(JUnit4.class)
@@ -63,7 +66,12 @@ public class BobTrollAccountingServiceTest {
 
     @Test
     public void testStreamDocuments() {
-        bobAccountingManager.streamDocuments()
-                .forEach(bobThePrinter::printDocument);
+        bobAccountingManager.streamAccountingEntries(eventListener)
+                .filter(e -> e.getDocumentOptional().isPresent())
+                .map(bobAccountingManager::getEntryDocumentPathOptional)
+                .map(Optional::get)
+                .peek(System.out::println)
+                .map(Files::exists)
+                .forEach(Assert::assertTrue);
     }
 }

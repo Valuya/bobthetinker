@@ -1,6 +1,5 @@
 package be.valuya.bob.core.domain;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;

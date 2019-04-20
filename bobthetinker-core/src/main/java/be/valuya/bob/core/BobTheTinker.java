@@ -21,8 +21,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.text.MessageFormat;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -44,12 +47,13 @@ import java.util.stream.Stream;
  */
 public class BobTheTinker {
 
-    public static final String ACCOUNT_TABLE_NAME = "ac_accoun";
-    public static final String PERIOD_TABLE_NAME = "ac_period";
-    public static final String COMPANY_TABLE_NAME = "ac_compan";
-    public static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
-    public static final String COMPANY_HISTORY_TABLE_NAME = "ac_chisto";
-    public static final String DOCUMENTS_TABLE_NAME = "dm_invdoc";
+    private static final String ACCOUNT_TABLE_NAME = "ac_accoun";
+    private static final String PERIOD_TABLE_NAME = "ac_period";
+    private static final String COMPANY_TABLE_NAME = "ac_compan";
+    private static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
+    private static final String COMPANY_HISTORY_TABLE_NAME = "ac_chisto";
+    private static final String DOCUMENTS_TABLE_NAME = "dm_invdoc";
+    private static final String DOCUMENT_RELATIVE_PATH_TEMPLATE = "Sage-box/BOBDOCS/{0}/{1}/{2}/{1} - {0} - {3} - {4}.pdf";
 
     private static Logger LOGGER = Logger.getLogger(BobTheTinker.class.getName());
 
@@ -109,5 +113,20 @@ public class BobTheTinker {
         BobDocumentRecordReader recordReader = new BobDocumentRecordReader();
         return advantajeService.streamTable(tableInputStream)
                 .map(recordReader::readDocument);
+    }
+
+    public Path getDocumentPath(BobFileConfiguration fileConfiguration,
+                                String bookYear, String dbk, String docNo,
+                                int bookPeriodYear, int bookPeriodMonth, LocalDate date) {
+        String yearPathName = String.format("%04d", bookPeriodYear);
+        String monthPathName = String.format("%02d", bookPeriodMonth);
+        String periodPathName = yearPathName + monthPathName;
+        DateTimeFormatter dateFileNamePartFormat = DateTimeFormatter.ofPattern("yyMMdd");
+        String dateFileNamePartName = date.format(dateFileNamePartFormat);
+
+        String relativePath = MessageFormat.format(DOCUMENT_RELATIVE_PATH_TEMPLATE,
+                bookYear, dbk, periodPathName, docNo, dateFileNamePartName);
+        Path baseFolderPath = fileConfiguration.getBaseFolderPath();
+        return baseFolderPath.resolve(relativePath);
     }
 }

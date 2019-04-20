@@ -26,6 +26,7 @@ import be.valuya.bob.core.BobTheTinker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -139,6 +140,27 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .map(this::convertToTrollDocument);
     }
 
+    @Override
+    public Optional<Path> getEntryDocumentPathOptional(ATAccountingEntry atAccountingEntry) {
+        return atAccountingEntry.getDocumentOptional()
+                .map(doc -> this.getDocumentPath(doc, atAccountingEntry));
+    }
+
+    private Path getDocumentPath(ATDocument atDocument, ATAccountingEntry accountingEntry) {
+        ATBookPeriod bookPeriod = atDocument.getBookPeriod();
+        String dbkCode = atDocument.getDbkCode();
+        int docNumber = atDocument.getDocNumber();
+        ATBookYear bookYear = bookPeriod.getBookYear();
+        String bookYearName = bookYear.getName();
+        String docNumberString = Integer.toString(docNumber);
+        int periodMonth = bookPeriod.getStartDate().getMonthValue();
+        int periodYear = bookPeriod.getStartDate().getYear();
+        LocalDate date = accountingEntry.getDate();
+
+        Path documentPath = bobTheTinker.getDocumentPath(bobFileConfiguration,
+                bookYearName, dbkCode, docNumberString, periodYear, periodMonth, date);
+        return documentPath;
+    }
 
     private Optional<BalanceChangeEvent> createYearlyResetBalanceChangeEventOptional(ATAccount atAccount, Map<String, AccountBalance> balancesPerAccountCode) {
         ATBookPeriod lastBookYearOpening = streamPeriods().filter(p -> p.getPeriodType() == ATPeriodType.OPENING)

@@ -11,6 +11,7 @@ import be.valuya.bob.core.domain.BobCompany;
 import be.valuya.bob.core.domain.BobPeriod;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.time.LocalDate;
 
@@ -76,6 +77,20 @@ public class BobThePrinter {
 
         String message = MessageFormat.format("document: [{0} {1}] ({2} {3}) {4}",
                 dbkCode, docNumberString, periodName, yearName, id);
+        System.out.println(message);
+    }
+
+    public void printDocument(ATDocument document, Path documentPath) {
+        ATBookPeriod bookPeriod = document.getBookPeriod();
+        String dbkCode = document.getDbkCode();
+        int docNumber = document.getDocNumber();
+
+        String docNumberString = Integer.toString(docNumber);
+        String periodName = bookPeriod.getName();
+        String yearName = bookPeriod.getBookYear().getName();
+
+        String message = MessageFormat.format("document: [{0} {1}] ({2} {3}) {4}",
+                dbkCode, docNumberString, periodName, yearName, documentPath);
         System.out.println(message);
     }
 
