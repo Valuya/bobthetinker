@@ -96,6 +96,38 @@ public class BobAccountHistoryEntry {
         this.hid = hid;
     }
 
+    public String getHdbk() {
+        return hdbk;
+    }
+
+    public String getHfyear() {
+        return hfyear;
+    }
+
+    public Integer getHmonth() {
+        return hmonth;
+    }
+
+    public Integer getHdocno() {
+        return hdocno;
+    }
+
+    public Integer getHorderno() {
+        return horderno;
+    }
+
+    public Integer getHyear() {
+        return hyear;
+    }
+
+    public BigDecimal getHamount() {
+        return hamount;
+    }
+
+    public LocalDate getHdocdate() {
+        return hdocdate;
+    }
+
     public Optional<String> getHdbkOptional() {
         return Optional.ofNullable(hdbk);
     }

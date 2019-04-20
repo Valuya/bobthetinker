@@ -192,15 +192,22 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private boolean isValidHistoryEntry(BobAccountHistoryEntry historyEntry) {
         String hid = historyEntry.getHid();
-        Optional<Integer> hmonthOptional = historyEntry.getHmonthOptional();
-        Optional<Integer> hyearOptional = historyEntry.getHyearOptional();
-        Optional<String> hdbkOptional = historyEntry.getHdbkOptional();
-        Optional<BigDecimal> hamountOptional = historyEntry.getHamountOptional();
+        String hfyear = historyEntry.getHfyear();
+        Integer hyear = historyEntry.getHyear();
+        Integer hmonth = historyEntry.getHmonth();
+        BigDecimal hamount = historyEntry.getHamount();
+        String hdbk = historyEntry.getHdbk();
+        Integer hdocno = historyEntry.getHdocno();
+        Integer horderno = historyEntry.getHorderno();
+
         return hid != null && isNotEmptyString(hid.trim())
-                && hmonthOptional.isPresent()
-                && hyearOptional.isPresent()
-                && hdbkOptional.isPresent()
-                && hamountOptional.isPresent()
+                && hfyear != null
+                && hyear != null
+                && hmonth != null
+                && hamount != null
+                && hdbk != null
+                && hdocno != null
+                && horderno != null
                 ;
     }
 
@@ -401,23 +408,24 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     private ATAccountingEntry convertToTrollAccountingEntry(BobAccountHistoryEntry entry) {
-        ATBookYear bookYear = entry.getHfyearOptional()
-                .flatMap(this::findBookYearByName)
-                .orElseThrow(() -> new BobException("No book year found with name " + entry.getHfyearOptional()));
+        String hfyear = entry.getHfyear();
+        String dbkCode = entry.getHdbk();
+        String accountNumber = entry.getHid();
+        BigDecimal amount = entry.getHamount();
+        Integer docNumber = entry.getHdocno();
+        Integer orderingNumber = entry.getHorderno();
+        LocalDate entryDate = entry.getHdocdate();
 
+
+        ATBookYear bookYear = findBookYearByName(hfyear)
+                .orElseThrow(() -> new BobException("No book year found with name " + hfyear));
         ATBookPeriod bookPeriod = listYearPeriods(bookYear).stream()
                 .filter(p -> this.isSameBookYearPeriod(p, entry))
                 .findAny()
                 .orElseThrow(() -> new BobException("No period found in entry for book year " + bookYear));
 
-        String dbkCode = entry.getHdbkOptional().orElseThrow(() -> new BobException("No dbk entry for accounting entry"));
-
-
-        String accountNumber = entry.getHid();
         ATAccount account = this.findAccountByCode(accountNumber)
                 .orElseThrow(() -> new BobException("No account found with code" + accountNumber));
-
-        BigDecimal amount = entry.getHamountOptional().orElseThrow(() -> new BobException("No amount for entry"));
         BigDecimal signedAmount = getSignedAmount(account, amount);
 
         Optional<String> thirdPartyName = entry.getHcussupOptional();
@@ -428,15 +436,15 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .filter(this::isNotEmptyString)
                 .flatMap(name -> this.findThirdPartyByIdAndType(name, thirdPartyType));
 
-        LocalDate entryDate = entry.getHdocdateOptional().orElseThrow(() -> new BobException("No date for entry"));
+        Optional<ATDocument> documentOptional = getDocuments().values()
+                .stream()
+                .filter(doc -> isSameDocument(doc, entry, bookPeriod))
+                .findAny();
+
         Optional<LocalDate> documentDateOptional = entry.getHdocdateOptional();
         Optional<LocalDate> dueDateOptional = entry.getHduedateOptional();
         Optional<String> commentOptional = entry.getHremOptional();
-        Integer docNumber = entry.getHdocnoOptional().orElse(-1);
-        Integer orderingNumber = entry.getHordernoOptional().orElse(-1);
-
         Optional<ATTax> taxOptional = Optional.empty(); //TODO
-        Optional<ATDocument> documentOptional = Optional.empty(); // TODO
 
         ATAccountingEntry accountingEntry = new ATAccountingEntry();
         accountingEntry.setBookPeriod(bookPeriod);
@@ -454,6 +462,19 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         accountingEntry.setTaxOptional(taxOptional);
         accountingEntry.setDocumentOptional(documentOptional);
         return accountingEntry;
+    }
+
+    private boolean isSameDocument(ATDocument doc, BobAccountHistoryEntry entry, ATBookPeriod bookPeriod) {
+        ATBookPeriod docPeriod = doc.getBookPeriod();
+        String docDbk = doc.getDbkCode();
+        int docDocNumber = doc.getDocNumber();
+
+        int entryDocNumber = entry.getHdocno();
+        String entryDbk = entry.getHdbk();
+
+        return docPeriod.equals(bookPeriod)
+                && docDbk.equals(entryDbk)
+                && docDocNumber == entryDocNumber;
     }
 
 
@@ -623,6 +644,14 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return thirdParties;
     }
 
+
+    private Map<String, ATDocument> getDocuments() {
+        if (documents == null) {
+            readDocuments();
+        }
+        return documents;
+    }
+
     private void readPeriods() {
         this.bookPeriods = streamPeriods()
                 .collect(Collectors.groupingBy(ATBookPeriod::getBookYear));
@@ -650,6 +679,14 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         this.thirdParties = streamThirdParties()
                 .collect(Collectors.toMap(
                         this::getTypedThirdPartyId,
+                        Function.identity()
+                ));
+    }
+
+    private void readDocuments() {
+        this.documents = streamDocuments()
+                .collect(Collectors.toMap(
+                        ATDocument::getId,
                         Function.identity()
                 ));
     }

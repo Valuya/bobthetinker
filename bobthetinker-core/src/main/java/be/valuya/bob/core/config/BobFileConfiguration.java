@@ -10,11 +10,11 @@ public class BobFileConfiguration {
     private Charset charset = StandardCharsets.ISO_8859_1;
 
     private boolean readTablesToMemory;
-
     private BalanceComputationMode balanceComputationMode;
 
     public BobFileConfiguration(Path baseFolderPath) {
         this.baseFolderPath = baseFolderPath;
+        balanceComputationMode = BalanceComputationMode.BOOK_YEAR_ENTRIES_ONLY;
     }
 
     public Path getBaseFolderPath() {

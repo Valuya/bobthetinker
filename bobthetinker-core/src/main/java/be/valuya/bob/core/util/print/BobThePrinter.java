@@ -55,9 +55,12 @@ public class BobThePrinter {
         String yearName = accountingEntry.getBookPeriod().getBookYear().getName();
         int docNumber = accountingEntry.getDocNumber();
         String docNumberString = Integer.toString(docNumber);
+        String docPresentString = accountingEntry.getDocumentOptional()
+                .map(a -> "[doc]")
+                .orElse("[ - ]");
 
-        String message = MessageFormat.format("accounting entry: [{4} {7}] {0} ({5} {6}), account {3} ({2}), {1} €",
-                date, amount, accountStr, accountCode, dbkCode, periodName, yearName, docNumberString);
+        String message = MessageFormat.format("accounting entry: [{4} {7}] {0} ({5} {6}) {8}, account {3} ({2}), {1} €",
+                date, amount, accountStr, accountCode, dbkCode, periodName, yearName, docNumberString, docPresentString);
         System.out.println(message);
     }
 
