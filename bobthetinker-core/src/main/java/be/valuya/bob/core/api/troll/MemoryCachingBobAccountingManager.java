@@ -240,14 +240,16 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
 
-    private BalanceChangeEvent createBalanceChangeEvent(AccountBalance newBalance, Optional<ATAccountingEntry> accountingEntryOptional) {
-        ATAccount account = newBalance.getAccount();
-        BigDecimal balanceAmount = newBalance.getBalance();
+    private BalanceChangeEvent createBalanceChangeEvent(AccountBalance accountBalance, Optional<ATAccountingEntry> accountingEntryOptional) {
+        ATAccount account = accountBalance.getAccount();
+        BigDecimal balanceAmount = accountBalance.getBalance();
+        LocalDate balanceDate = accountBalance.getDate();
 
         BalanceChangeEvent changeEvent = new BalanceChangeEvent();
-        changeEvent.setAccountingEntryOptional(accountingEntryOptional);
         changeEvent.setAccount(account);
         changeEvent.setNewBalance(balanceAmount);
+        changeEvent.setDate(balanceDate);
+        changeEvent.setAccountingEntryOptional(accountingEntryOptional);
         return changeEvent;
     }
 
