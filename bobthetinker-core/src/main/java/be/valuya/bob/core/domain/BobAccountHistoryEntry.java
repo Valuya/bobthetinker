@@ -1,6 +1,8 @@
 package be.valuya.bob.core.domain;
 
+import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,37 +14,30 @@ import java.util.Optional;
 public class BobAccountHistoryEntry {
 
     @NotNull
+    @Size(min = 1)
     private String hid; // STRING - 10 -
-
-    /**
-     * Journal code? 'ODV', 'ACH',
-     */
+    @NotNull
+    @Size(min = 1)
     private String hdbk; // STRING - 4 -
-    /**
-     * Book year label
-     */
+    @NotNull
+    @Size(min = 1)
     private String hfyear; // STRING - 5 -
-    /**
-     * Might be 0, in which case hdbk seems to be 'REO', and horderno seems incremented for
-     * each account (hid) and ctrprtacc is '**'.
-     */
+    @NotNull
+    @Min(0)
     private Integer hmonth; // INTEGER - 4 -
+    @NotNull
+    @Min(0)
     private Integer hdocno; // INTEGER - 4 -
-    /**
-     * Looks like this can be used to check whether the ledger entry is matched.
-     * An entry with hid=A, cntrprtacc=B, horderno=1 should be matched with an entry
-     * with hid=B, cntrprtacc=A, horderno=2. Sometimes it goes further than 2.
-     */
+    @NotNull
+    @Min(0)
     private Integer horderno; // INTEGER - 4 -
-    /**
-     * 'CAS', 'PRI', 'PUR', ..
-     */
+    @NotNull
+    @Size(min = 1)
     private String hdbtype; // STRING - 3 -
+    @NotNull
+    @Min(1)
     private Integer hyear; // INTEGER - 4 -
-    /**
-     * Name (id) of the customer/supplier company.
-     * The hcstype seems to be set when this field is set
-     */
+
     private String hcussup; // STRING - 10 -
     private LocalDate hdocdate; // DATE - 4 -
     private LocalDate hduedate; // DATE - 4 -

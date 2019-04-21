@@ -1,6 +1,7 @@
 package be.valuya.bob.core.domain;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -11,6 +12,7 @@ import java.util.Optional;
 public class BobAccount {
 
     @NotNull
+    @Size(min = 1)
     private String aid;
 
     private Boolean aIsTitle;
@@ -23,9 +25,7 @@ public class BobAccount {
     private String aCat;
     private String aIntCat;
     private String aCatComm;
-    /**
-     * D or C depending on whether debit or credit account.
-     */
+    @NotNull
     private String adbcd;
 
     private Boolean aiscost; //: (LOGICAL, 1): [-]
@@ -167,8 +167,8 @@ public class BobAccount {
         this.aCatComm = aCatComm;
     }
 
-    public Optional<String> getAdbcdOptional() {
-        return Optional.ofNullable(adbcd);
+    public String getAdbcd() {
+        return adbcd;
     }
 
     public void setAdbcd(String adbcd) {

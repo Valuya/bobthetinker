@@ -33,12 +33,12 @@ public class BobThePrinter {
 
     public void printCompany(BobCompany bobCompany) {
         String cid = bobCompany.getcId();
+        String name1 = bobCompany.getcName1();
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append(cid);
+        stringBuilder.append(name1);
 
-        bobCompany.getcName1Optional()
-                .ifPresent(stringBuilder::append);
         bobCompany.getcName2Optional()
                 .ifPresent(stringBuilder::append);
 
@@ -57,10 +57,10 @@ public class BobThePrinter {
         int docNumber = accountingEntry.getDocNumber();
         String docNumberString = Integer.toString(docNumber);
         String docPresentString = accountingEntry.getDocumentOptional()
-                .map(a -> "[doc]")
-                .orElse("[ - ]");
+                .map(a -> "doc")
+                .orElse(" - ");
 
-        String message = MessageFormat.format("accounting entry: [{4} {7}] {0} ({5} {6}) {8}, account {3} ({2}), {1} €",
+        String message = MessageFormat.format("accounting entry: [{4} {7}] ({5} {6}) [{8}] date={0}, account={3} {1} €",
                 date, amount, accountStr, accountCode, dbkCode, periodName, yearName, docNumberString, docPresentString);
         System.out.println(message);
     }
@@ -77,20 +77,6 @@ public class BobThePrinter {
 
         String message = MessageFormat.format("document: [{0} {1}] ({2} {3}) {4}",
                 dbkCode, docNumberString, periodName, yearName, id);
-        System.out.println(message);
-    }
-
-    public void printDocument(ATDocument document, Path documentPath) {
-        ATBookPeriod bookPeriod = document.getBookPeriod();
-        String dbkCode = document.getDbkCode();
-        int docNumber = document.getDocNumber();
-
-        String docNumberString = Integer.toString(docNumber);
-        String periodName = bookPeriod.getName();
-        String yearName = bookPeriod.getBookYear().getName();
-
-        String message = MessageFormat.format("document: [{0} {1}] ({2} {3}) {4}",
-                dbkCode, docNumberString, periodName, yearName, documentPath);
         System.out.println(message);
     }
 

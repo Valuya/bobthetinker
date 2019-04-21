@@ -10,11 +10,15 @@ public class BobFileConfiguration {
     private Charset charset = StandardCharsets.ISO_8859_1;
 
     private boolean readTablesToMemory;
+    private boolean throwOnInvalidRecord;
     private BalanceComputationMode balanceComputationMode;
+    private DocumentFileReconciliationMode documentFileReconciliationMode;
 
     public BobFileConfiguration(Path baseFolderPath) {
         this.baseFolderPath = baseFolderPath;
         balanceComputationMode = BalanceComputationMode.BOOK_YEAR_ENTRIES_ONLY;
+        documentFileReconciliationMode = DocumentFileReconciliationMode.LAZILY_LIST_FOLDER_CONTENT;
+        throwOnInvalidRecord = true;
     }
 
     public Path getBaseFolderPath() {
@@ -48,5 +52,21 @@ public class BobFileConfiguration {
 
     public void setBalanceComputationMode(BalanceComputationMode balanceComputationMode) {
         this.balanceComputationMode = balanceComputationMode;
+    }
+
+    public DocumentFileReconciliationMode getDocumentFileReconciliationMode() {
+        return documentFileReconciliationMode;
+    }
+
+    public void setDocumentFileReconciliationMode(DocumentFileReconciliationMode documentFileReconciliationMode) {
+        this.documentFileReconciliationMode = documentFileReconciliationMode;
+    }
+
+    public boolean isThrowOnInvalidRecord() {
+        return throwOnInvalidRecord;
+    }
+
+    public void setThrowOnInvalidRecord(boolean throwOnInvalidRecord) {
+        this.throwOnInvalidRecord = throwOnInvalidRecord;
     }
 }

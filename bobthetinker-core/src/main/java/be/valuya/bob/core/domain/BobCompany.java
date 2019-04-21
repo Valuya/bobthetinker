@@ -1,15 +1,22 @@
 package be.valuya.bob.core.domain;
 
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 public class BobCompany {
 
+    @NotNull
+    @Size(min = 1)
     private String cId;
+
     private Optional<String> cCustomerTypeOptional;
     private Optional<String> cSupplierTypeOptional;
-    private Optional<String> cName1Optional;
+    @NotNull
+    @Size(min = 1)
+    private String cName1;
     private Optional<String> cName2Optional;
     private Optional<String> cAddress1Optional;
     private Optional<String> cAddress2Optional;
@@ -185,12 +192,12 @@ public class BobCompany {
         this.cSupplierTypeOptional = cSupplierTypeOptional;
     }
 
-    public Optional<String> getcName1Optional() {
-        return cName1Optional;
+    public String getcName1() {
+        return cName1;
     }
 
-    public void setcName1Optional(Optional<String> cName1Optional) {
-        this.cName1Optional = cName1Optional;
+    public void setcName1(String cName1) {
+        this.cName1 = cName1;
     }
 
     public Optional<String> getcName2Optional() {

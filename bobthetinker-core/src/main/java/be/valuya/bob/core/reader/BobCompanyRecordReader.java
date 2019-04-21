@@ -170,7 +170,7 @@ public class BobCompanyRecordReader {
         bobCompany.setcId(cId);
         bobCompany.setcCustomerTypeOptional(cCustomerType);
         bobCompany.setcSupplierTypeOptional(cSupplierType);
-        bobCompany.setcName1Optional(cName1);
+        bobCompany.setcName1(cName1.orElse(null));
         bobCompany.setcName2Optional(cName2);
         bobCompany.setcAddress1Optional(cAddress1);
         bobCompany.setcAddress2Optional(cAddress2);

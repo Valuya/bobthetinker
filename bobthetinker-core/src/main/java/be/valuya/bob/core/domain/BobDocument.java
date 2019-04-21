@@ -1,5 +1,8 @@
 package be.valuya.bob.core.domain;
 
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,11 +23,20 @@ import java.util.Optional;
  * APPCIRCUITID: (STRING, 10):
  */
 public class BobDocument {
+    @NotNull
+    @Size(min = 1)
     private String id;
+    @NotNull
+    @Size(min = 1)
     private String fyear;
+    @Min(1)
     private int year;
+    @Min(0)
     private int month;
+    @NotNull
+    @Size(min = 1)
     private String dbk;
+    @Min(0)
     private int docNo;
 
     private Optional<String> dbType;

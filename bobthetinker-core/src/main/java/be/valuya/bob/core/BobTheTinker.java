@@ -28,6 +28,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -53,7 +55,10 @@ public class BobTheTinker {
     private static final String ACCOUNT_HISTORY_TABLE_NAME = "ac_ahisto";
     private static final String COMPANY_HISTORY_TABLE_NAME = "ac_chisto";
     private static final String DOCUMENTS_TABLE_NAME = "dm_invdoc";
-    private static final String DOCUMENT_RELATIVE_PATH_TEMPLATE = "Sage-box/BOBDOCS/{0}/{1}/{2}/{1} - {0} - {3} - {4}.pdf";
+
+    private static final String DOCUMENT_DIRECTORY_PATH_TEMPLATE = "Sage-box/BOBDOCS/{0}/{1}/{2}";
+    private static final String DOCUMENT_FILE_NAME_TEMPLATE = "{0} - {1} - {2} - {3}.pdf";
+    private static final Pattern DOCUMENT_FILE_NAME_PATTERN = Pattern.compile("(\\w+) - (\\w+) - (\\w+) - (\\w+)\\.pdf");
 
     private static Logger LOGGER = Logger.getLogger(BobTheTinker.class.getName());
 
@@ -115,18 +120,45 @@ public class BobTheTinker {
                 .map(recordReader::readDocument);
     }
 
-    public Path getDocumentPath(BobFileConfiguration fileConfiguration,
-                                String bookYear, String dbk, String docNo,
-                                int bookPeriodYear, int bookPeriodMonth, LocalDate date) {
-        String yearPathName = String.format("%04d", bookPeriodYear);
-        String monthPathName = String.format("%02d", bookPeriodMonth);
+    public Path getDocumentDirectoryPath(BobFileConfiguration fileConfiguration,
+                                         String bookyearname, String dbkCode, int periodyear, int periodMonth) {
+        String yearPathName = String.format("%04d", periodyear);
+        String monthPathName = String.format("%02d", periodMonth);
         String periodPathName = yearPathName + monthPathName;
+
+        String pathName = MessageFormat.format(DOCUMENT_DIRECTORY_PATH_TEMPLATE, bookyearname, dbkCode, periodPathName);
+        Path baseFolderPath = fileConfiguration.getBaseFolderPath();
+        return baseFolderPath.resolve(pathName);
+    }
+
+    public Path getDocumentPath(BobFileConfiguration fileConfiguration,
+                                String bookYearName, String dbkCode, int docNumber,
+                                int bookPeriodYear, int bookPeriodMonth, LocalDate date) {
+        Path directorypath = getDocumentDirectoryPath(fileConfiguration, bookYearName, dbkCode, bookPeriodYear, bookPeriodMonth);
+
+        String docNumberName = String.format("%d", docNumber);
         DateTimeFormatter dateFileNamePartFormat = DateTimeFormatter.ofPattern("yyMMdd");
         String dateFileNamePartName = date.format(dateFileNamePartFormat);
+        String fileName = MessageFormat.format(DOCUMENT_FILE_NAME_TEMPLATE, dbkCode, bookYearName, docNumberName, dateFileNamePartName);
 
-        String relativePath = MessageFormat.format(DOCUMENT_RELATIVE_PATH_TEMPLATE,
-                bookYear, dbk, periodPathName, docNo, dateFileNamePartName);
-        Path baseFolderPath = fileConfiguration.getBaseFolderPath();
-        return baseFolderPath.resolve(relativePath);
+        return directorypath.resolve(fileName);
+    }
+
+    public boolean matchesDocumentFilePath(Path filePath, String bookYearName, String dbkCode, int docNumber) {
+        String fileNameString = filePath.getFileName().toString();
+        String docNumberName = String.format("%d", docNumber);
+
+        Matcher matcher = DOCUMENT_FILE_NAME_PATTERN.matcher(fileNameString);
+        if (matcher.matches()) {
+            String fileDbkCode = matcher.group(1);
+            String fileBookyearName = matcher.group(2);
+            String fileDocNumber = matcher.group(3);
+
+            return fileDbkCode.equals(dbkCode)
+                    && fileBookyearName.equals(bookYearName)
+                    && fileDocNumber.equals(docNumberName);
+        } else {
+            return false;
+        }
     }
 }

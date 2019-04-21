@@ -1,16 +1,29 @@
 package be.valuya.bob.core.domain;
 
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 public class BobPeriod {
 
+    @NotNull
+    @Size(min = 1)
     private String fYear;
+    @NotNull
+    @Min(1)
     private int year;
+    @Min(0)
     private int month;
+    @NotNull
+    @Size(min = 1)
     private String status;
     private boolean defaultPeriod;
+    @NotNull
+    @Size(min = 1)
     private String label;
+
     private Optional<Boolean> ctrlPrintOptional;
     private Optional<String> originOptional;
     private Optional<Integer> curLevelOptional;
