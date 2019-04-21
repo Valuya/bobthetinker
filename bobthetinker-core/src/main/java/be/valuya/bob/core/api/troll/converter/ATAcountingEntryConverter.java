@@ -35,6 +35,7 @@ public class ATAcountingEntryConverter {
         String accountNumber = entry.getHid();
         BigDecimal amount = entry.getHamount();
         Integer docNumber = entry.getHdocno();
+        String docNumberString = String.format("%d", docNumber);
         Integer orderingNumber = entry.getHorderno();
         LocalDate entryDate = entry.getHdocdate();
 
@@ -56,7 +57,7 @@ public class ATAcountingEntryConverter {
         accountingEntry.setAmount(signedAmount);
         accountingEntry.setDbkCode(dbkCode);
         accountingEntry.setAccount(account);
-        accountingEntry.setDocNumber(docNumber);
+        accountingEntry.setDocNumber(docNumberString);
         accountingEntry.setOrderingNumber(orderingNumber);
 
         accountingEntry.setThirdPartyOptional(thirdPartyOptional);
