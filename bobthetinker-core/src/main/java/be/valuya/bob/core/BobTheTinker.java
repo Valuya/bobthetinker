@@ -132,21 +132,19 @@ public class BobTheTinker {
     }
 
     public Path getDocumentPath(BobFileConfiguration fileConfiguration,
-                                String bookYearName, String dbkCode, int docNumber,
+                                String bookYearName, String dbkCode, String docNumber,
                                 int bookPeriodYear, int bookPeriodMonth, LocalDate date) {
         Path directorypath = getDocumentDirectoryPath(fileConfiguration, bookYearName, dbkCode, bookPeriodYear, bookPeriodMonth);
 
-        String docNumberName = String.format("%d", docNumber);
         DateTimeFormatter dateFileNamePartFormat = DateTimeFormatter.ofPattern("yyMMdd");
         String dateFileNamePartName = date.format(dateFileNamePartFormat);
-        String fileName = MessageFormat.format(DOCUMENT_FILE_NAME_TEMPLATE, dbkCode, bookYearName, docNumberName, dateFileNamePartName);
+        String fileName = MessageFormat.format(DOCUMENT_FILE_NAME_TEMPLATE, dbkCode, bookYearName, docNumber, dateFileNamePartName);
 
         return directorypath.resolve(fileName);
     }
 
-    public boolean matchesDocumentFilePath(Path filePath, String bookYearName, String dbkCode, int docNumber) {
+    public boolean matchesDocumentFilePath(Path filePath, String bookYearName, String dbkCode, String docNumber) {
         String fileNameString = filePath.getFileName().toString();
-        String docNumberName = String.format("%d", docNumber);
 
         Matcher matcher = DOCUMENT_FILE_NAME_PATTERN.matcher(fileNameString);
         if (matcher.matches()) {
@@ -156,7 +154,7 @@ public class BobTheTinker {
 
             return fileDbkCode.equals(dbkCode)
                     && fileBookyearName.equals(bookYearName)
-                    && fileDocNumber.equals(docNumberName);
+                    && fileDocNumber.equals(docNumber);
         } else {
             return false;
         }

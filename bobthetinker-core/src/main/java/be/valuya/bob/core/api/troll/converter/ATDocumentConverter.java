@@ -32,12 +32,13 @@ public class ATDocumentConverter {
 
         ATBookYear bookYear = accountingManagerCache.getBookYeaOrThrow(fyear);
         ATBookPeriod bookPeriod = getBookPeriod(bobDocument, bookYear);
+        String docNumberString = String.format("%d", docNo);
 
         ATDocument atDocument = new ATDocument();
         atDocument.setId(id);
         atDocument.setBookPeriod(bookPeriod);
         atDocument.setDbkCode(dbk);
-        atDocument.setDocNumber(docNo);
+        atDocument.setDocNumberOptional(Optional.of(docNumberString));
         return atDocument;
     }
 

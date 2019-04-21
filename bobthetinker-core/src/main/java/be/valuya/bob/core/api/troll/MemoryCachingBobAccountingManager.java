@@ -130,7 +130,8 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private Optional<Path> findDocumentFilePathFromParentDirectory(ATDocument atDocument) throws IOException {
         Path documentDirectoryPath = getDocumentDirectoryPath(atDocument);
-        int docNumber = atDocument.getDocNumber();
+        String docNumber = atDocument.getDocNumberOptional()
+                .orElseThrow(() -> new BobException("No document number"));
         String dbkCode = atDocument.getDbkCode();
         ATBookPeriod bookPeriod = atDocument.getBookPeriod();
         ATBookYear bookYear = bookPeriod.getBookYear();
@@ -157,7 +158,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private Path getDocumentFilePath(ATDocument atDocument) {
         ATBookPeriod bookPeriod = atDocument.getBookPeriod();
         String dbkCode = atDocument.getDbkCode();
-        int docNumber = atDocument.getDocNumber();
+        String docNumber = atDocument.getDocNumberOptional().orElseThrow(() -> new BobException("No doc number"));
         ATBookYear bookYear = bookPeriod.getBookYear();
         String bookYearName = bookYear.getName();
         int periodMonth = bookPeriod.getStartDate().getMonthValue();

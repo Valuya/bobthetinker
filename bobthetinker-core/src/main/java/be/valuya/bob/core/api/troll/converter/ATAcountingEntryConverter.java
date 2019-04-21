@@ -84,14 +84,16 @@ public class ATAcountingEntryConverter {
     private boolean isSameDocument(ATDocument doc, BobAccountHistoryEntry entry, ATBookPeriod bookPeriod) {
         ATBookPeriod docPeriod = doc.getBookPeriod();
         String docDbk = doc.getDbkCode();
-        int docDocNumber = doc.getDocNumber();
+        String docDocNumber = doc.getDocNumberOptional()
+                .orElseThrow(() -> new BobException("Invalid document entity: " + doc));
 
         int entryDocNumber = entry.getHdocno();
         String entryDbk = entry.getHdbk();
+        String entryDocNumberString = String.format("%d", entryDocNumber);
 
         return docPeriod.equals(bookPeriod)
                 && docDbk.equals(entryDbk)
-                && docDocNumber == entryDocNumber;
+                && entryDocNumberString.equals(docDocNumber);
     }
 
     private Optional<ATThirdParty> getThirdPartyOptional(BobAccountHistoryEntry entry) {
