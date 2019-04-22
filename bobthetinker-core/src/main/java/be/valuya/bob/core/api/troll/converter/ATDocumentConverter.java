@@ -38,7 +38,7 @@ public class ATDocumentConverter {
         atDocument.setId(id);
         atDocument.setBookPeriod(bookPeriod);
         atDocument.setDbkCode(dbk);
-        atDocument.setDocNumberOptional(Optional.of(docNumberString));
+        atDocument.setDocumentNumnber(docNumberString);
         return atDocument;
     }
 

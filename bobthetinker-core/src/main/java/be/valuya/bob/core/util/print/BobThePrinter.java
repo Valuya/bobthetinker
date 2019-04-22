@@ -68,7 +68,7 @@ public class BobThePrinter {
         String id = document.getId();
         ATBookPeriod bookPeriod = document.getBookPeriod();
         String dbkCode = document.getDbkCode();
-        String docNumber = document.getDocNumberOptional().orElse("?");
+        String docNumber = document.getDocumentNumnber();
 
         String periodName = bookPeriod.getName();
         String yearName = bookPeriod.getBookYear().getName();
