@@ -3,7 +3,7 @@ package be.valuya.bob.core.api.troll;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATDocument;
 import be.valuya.bob.core.config.BobFileConfiguration;
-import be.valuya.bob.core.test.categories.LocalDev;
+import be.valuya.bob.core.test.categories.LocalBobDossierCategory;
 import be.valuya.bob.core.util.print.BobThePrinter;
 import org.junit.Assert;
 import org.junit.Before;
@@ -17,7 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-@Category(LocalDev.class)
+@Category(LocalBobDossierCategory.class)
 @RunWith(JUnit4.class)
 public class BobTrollAccountingServiceTest {
 

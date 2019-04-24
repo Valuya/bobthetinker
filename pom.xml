@@ -115,6 +115,18 @@
                     </executions>
                 </plugin>
 
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>2.22.1</version>
+                    <configuration>
+                        <groups>be.valuya.bob.core.test.categories.DefaultCategory</groups>
+                        <systemPropertyVariables>
+                            <bob.test.folder>${bob.test.folder}</bob.test.folder>
+                        </systemPropertyVariables>
+                    </configuration>
+                </plugin>
+
             </plugins>
 
         </pluginManagement>
