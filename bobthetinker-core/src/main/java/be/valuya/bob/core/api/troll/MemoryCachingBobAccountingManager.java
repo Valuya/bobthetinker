@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -34,6 +35,7 @@ import java.util.stream.Stream;
 public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     private static final BigDecimal ZERO_EURO = BigDecimal.ZERO.setScale(3, RoundingMode.UNNECESSARY);
+    private static final String DOCUMENT_UPLOAD_PATH_NAME = "Demat";
 
     private final BobTheTinker bobTheTinker;
     private final BobFileConfiguration bobFileConfiguration;
@@ -113,19 +115,19 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     @Override
     public InputStream streamDocumentContent(ATDocument atDocument) throws Exception {
-        if (atDocument.getDateOptional().isPresent()) {
-            Path documentPath = getDocumentFilePath(atDocument);
-            return Files.newInputStream(documentPath);
-        } else {
-            DocumentFileReconciliationMode reconciliationMode = bobFileConfiguration.getDocumentFileReconciliationMode();
-            if (reconciliationMode == DocumentFileReconciliationMode.EAGERLY_STREAM_ENTRIES) {
-                throw new BobException("Could not reconciliate documenbt date for doc: " + atDocument);
-            }
+        Path documentAbsolutePath = getDocumentAbsolutePath(atDocument);
+        return Files.newInputStream(documentAbsolutePath);
+    }
 
-            Path filePath = findDocumentFilePathFromParentDirectory(atDocument)
-                    .orElseThrow(() -> new BobException("Could not find any file matching document " + atDocument));
-            return Files.newInputStream(filePath);
-        }
+    @Override
+    public void uploadDocument(Path documentPath, InputStream inputStream) throws Exception {
+        Path baseFolderPath = bobFileConfiguration.getBaseFolderPath();
+        Path documentFullPath = baseFolderPath.resolve(DOCUMENT_UPLOAD_PATH_NAME)
+                .resolve(documentPath);
+        Path documentDirectoryPath = documentFullPath.getParent();
+
+        Files.createDirectories(documentDirectoryPath);
+        Files.copy(inputStream, documentFullPath, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private Optional<Path> findDocumentFilePathFromParentDirectory(ATDocument atDocument) throws IOException {
@@ -154,21 +156,6 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return documentPath;
     }
 
-    private Path getDocumentFilePath(ATDocument atDocument) {
-        ATBookPeriod bookPeriod = atDocument.getBookPeriod();
-        String dbkCode = atDocument.getDbkCode();
-        String docNumber = atDocument.getDocumentNumnber();
-        ATBookYear bookYear = bookPeriod.getBookYear();
-        String bookYearName = bookYear.getName();
-        int periodMonth = bookPeriod.getStartDate().getMonthValue();
-        int periodYear = bookPeriod.getStartDate().getYear();
-        LocalDate date = atDocument.getDateOptional()
-                .orElseThrow(() -> new BobException("No document date to build filename"));
-
-        Path documentPath = bobTheTinker.getDocumentPath(bobFileConfiguration,
-                bookYearName, dbkCode, docNumber, periodYear, periodMonth, date);
-        return documentPath;
-    }
 
     private Optional<BalanceChangeEvent> createYearlyResetBalanceChangeEventOptional(ATAccount atAccount, Map<String, AccountBalance> balancesPerAccountCode) {
         ATBookPeriod lastBookYearOpening = streamPeriods().filter(p -> p.getPeriodType() == ATPeriodType.OPENING)
@@ -368,5 +355,35 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     private <T> Stream<T> streamOptional(Optional<T> optionalValue) {
         return optionalValue.map(Stream::of)
                 .orElseGet(Stream::empty);
+    }
+
+    private Path getDocumentAbsolutePath(ATDocument atDocument) throws IOException {
+        if (atDocument.getDateOptional().isPresent()) {
+            return getDatedDocumentFileAbsolutePath(atDocument);
+        } else {
+            DocumentFileReconciliationMode reconciliationMode = bobFileConfiguration.getDocumentFileReconciliationMode();
+            if (reconciliationMode == DocumentFileReconciliationMode.EAGERLY_STREAM_ENTRIES) {
+                throw new BobException("Could not reconciliate documenbt date for doc: " + atDocument);
+            }
+
+            return findDocumentFilePathFromParentDirectory(atDocument)
+                    .orElseThrow(() -> new BobException("Could not find any file matching document " + atDocument));
+        }
+    }
+
+    private Path getDatedDocumentFileAbsolutePath(ATDocument atDocument) {
+        ATBookPeriod bookPeriod = atDocument.getBookPeriod();
+        String dbkCode = atDocument.getDbkCode();
+        String docNumber = atDocument.getDocumentNumnber();
+        ATBookYear bookYear = bookPeriod.getBookYear();
+        String bookYearName = bookYear.getName();
+        int periodMonth = bookPeriod.getStartDate().getMonthValue();
+        int periodYear = bookPeriod.getStartDate().getYear();
+        LocalDate date = atDocument.getDateOptional()
+                .orElseThrow(() -> new BobException("No document date to build filename"));
+
+        Path documentPath = bobTheTinker.getDocumentPath(bobFileConfiguration,
+                bookYearName, dbkCode, docNumber, periodYear, periodMonth, date);
+        return documentPath;
     }
 }
