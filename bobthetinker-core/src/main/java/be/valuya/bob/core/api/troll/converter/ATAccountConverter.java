@@ -13,11 +13,13 @@ public class ATAccountConverter {
                 .orElse("-");
         boolean yearResetAccount = isYearResetAccount(accountNumber);
         String adbcd = bobAccount.getAdbcd();
+        boolean titleAcount = bobAccount.getaIsTitleOptional().orElse(false);
         ATAccountImputationType atAccountImputationType = this.createATAccountImputationType(adbcd);
 
         ATAccount account = new ATAccount();
         account.setCode(accountNumber);
         account.setName(name);
+        account.setTitle(titleAcount);
         account.setYearlyBalanceReset(yearResetAccount);
         account.setImputationType(atAccountImputationType);
         return account;
