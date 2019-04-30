@@ -2,7 +2,9 @@ package be.valuya.bob.core.api.troll;
 
 import be.valuya.accountingtroll.AccountingEventListener;
 import be.valuya.accountingtroll.AccountingManager;
+import be.valuya.accountingtroll.cache.AccountBalanceSpliterator;
 import be.valuya.accountingtroll.domain.ATAccount;
+import be.valuya.accountingtroll.domain.ATAccountBalance;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
@@ -30,7 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class MemoryCachingBobAccountingManager implements AccountingManager {
 
@@ -82,22 +86,19 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     @Override
-    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-        // Balance cache
-        Map<String, AccountBalance> balancesPerAccountCode = new ConcurrentSkipListMap<>();
+    public Stream<ATAccountingEntry> streamAccountingEntries() {
+        return accountingManagerCache.getAccountingEntries().stream()
+                .sorted();
+    }
 
-        Stream<ATAccountingEntry> entryStream = accountingManagerCache.getAccountingEntries()
-                .stream()
-                .sorted()
-                .flatMap(entry -> streamWithBalanceCheck(entry, balancesPerAccountCode, accountingEventListener));
-
-        // Ensure all accounts with the yealryReset flag will fire a balance change event if relevant.
-        streamAccounts().filter(ATAccount::isYearlyBalanceReset)
-                .map(account -> this.createYearlyResetBalanceChangeEventOptional(account, balancesPerAccountCode))
-                .flatMap(this::streamOptional)
-                .forEach(accountingEventListener::handleBalanceChangeEvent);
-
-        return entryStream;
+    @Override
+    public Stream<ATAccountBalance> streamAccountBalances() {
+        List<ATBookPeriod> openingPeriods = streamPeriods().sorted()
+                .filter(p -> p.getPeriodType() == ATPeriodType.OPENING)
+                .collect(Collectors.toList());
+        Stream<ATAccountingEntry> entryStream = streamAccountingEntries();
+        AccountBalanceSpliterator balanceSpliterator = new AccountBalanceSpliterator(entryStream, openingPeriods);
+        return StreamSupport.stream(balanceSpliterator, false);
     }
 
     @Override
