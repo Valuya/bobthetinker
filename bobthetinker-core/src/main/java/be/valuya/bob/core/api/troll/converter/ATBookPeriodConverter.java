@@ -34,8 +34,7 @@ public class ATBookPeriodConverter {
         ATPeriodType periodType;
         if (month == 0) {
             periodStartDate = bookYear.getStartDate();
-            // TODO: to mimic winbooks, but might not be monthly periods
-            periodEndDate = periodStartDate.plusMonths(1);
+            periodEndDate = periodStartDate;
             periodType = ATPeriodType.OPENING;
         } else {
             periodStartDate = getPeriodStartDate(bobPeriod);

@@ -147,7 +147,6 @@ public class ATAcountingEntryConverter {
         return isSamePeriod(bookPeriod, entryYear, entryMonth);
     }
 
-
     private boolean isSamePeriod(ATBookPeriod bookPeriod, int year, int month) {
         if (month == 0) {
             return bookPeriod.getPeriodType() == ATPeriodType.OPENING;

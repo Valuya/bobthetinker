@@ -95,6 +95,20 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .collect(Collectors.toList());
         Stream<ATAccountingEntry> entryStream = streamAccountingEntries();
         AccountBalanceSpliterator balanceSpliterator = new AccountBalanceSpliterator(entryStream, allPeriods);
+
+        BalanceComputationMode balanceComputationMode = bobFileConfiguration.getBalanceComputationMode();
+
+        switch (balanceComputationMode) {
+            case BOOK_YEAR_ENTRIES_ONLY:
+                balanceSpliterator.setIgnoreIntermediatePeriodOpeningEntry(false);
+                balanceSpliterator.setResetEveryYear(true);
+                break;
+            case IGNORE_OPENINGS_FOR_INTERMEDIATE_YEARS:
+                balanceSpliterator.setIgnoreIntermediatePeriodOpeningEntry(true);
+                balanceSpliterator.setResetEveryYear(false);
+                break;
+        }
+
         return StreamSupport.stream(balanceSpliterator, false);
     }
 
