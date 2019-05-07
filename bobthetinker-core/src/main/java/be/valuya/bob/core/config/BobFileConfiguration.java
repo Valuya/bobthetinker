@@ -3,6 +3,8 @@ package be.valuya.bob.core.config;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.util.Optional;
 
 public class BobFileConfiguration {
 
@@ -13,6 +15,9 @@ public class BobFileConfiguration {
     private boolean throwOnInvalidRecord;
     private BalanceComputationMode balanceComputationMode;
     private DocumentFileReconciliationMode documentFileReconciliationMode;
+
+    private Optional<LocalDate> bookYearMinStartDate = Optional.empty();
+    private Optional<LocalDate> bookYearMaxStartDate = Optional.empty();
 
     public BobFileConfiguration(Path baseFolderPath) {
         this.baseFolderPath = baseFolderPath;
@@ -68,5 +73,21 @@ public class BobFileConfiguration {
 
     public void setThrowOnInvalidRecord(boolean throwOnInvalidRecord) {
         this.throwOnInvalidRecord = throwOnInvalidRecord;
+    }
+
+    public Optional<LocalDate> getBookYearMinStartDate() {
+        return bookYearMinStartDate;
+    }
+
+    public void setBookYearMinStartDate(LocalDate bookYearMinStartDate) {
+        this.bookYearMinStartDate = Optional.of(bookYearMinStartDate);
+    }
+
+    public Optional<LocalDate> getBookYearMaxStartDate() {
+        return bookYearMaxStartDate;
+    }
+
+    public void setBookYearMaxStartDate(LocalDate bookYearMaxStartDate) {
+        this.bookYearMaxStartDate = Optional.of(bookYearMaxStartDate);
     }
 }
