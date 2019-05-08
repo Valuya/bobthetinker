@@ -53,6 +53,29 @@
         <url>http://github.com/Valuya/bobthetinker/tree/master</url>
     </scm>
 
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>be.valuya.advantaje</groupId>
+                <artifactId>advantaje-core</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>be.valuya.accountingtroll</groupId>
+                <artifactId>accountingtroll</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>javax.validation</groupId>
+                <artifactId>validation-api</artifactId>
+                <version>2.0.1.Final</version>
+                <scope>provided</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
     <build>
         <pluginManagement>
             <plugins>
