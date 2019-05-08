@@ -85,6 +85,7 @@ public class AccountingManagerCache {
 
 
     public Map<ATBookYear, List<ATBookPeriod>> getBookPeriods() {
+        getBookYears();
         if (bookPeriodsByBookYear == null) {
             readPeriods();
         }
@@ -93,6 +94,8 @@ public class AccountingManagerCache {
 
 
     public Map<String, ATAccount> getAccounts() {
+        getBookYears();
+        getBookPeriods();
         if (accountsByCode == null) {
             readAccounts();
         }
@@ -118,6 +121,8 @@ public class AccountingManagerCache {
     }
 
     public Map<String, ATDocument> getDocuments() {
+        getBookYears();
+        getBookPeriods();
         if (documentsById == null) {
             readDocuments();
         }
@@ -125,6 +130,11 @@ public class AccountingManagerCache {
     }
 
     public List<ATAccountingEntry> getAccountingEntries() {
+        getBookYears();
+        getBookPeriods();
+        getAccounts();
+        getThirdParties();
+        getDocuments();
         if (accountingEntries == null) {
             readAccountingEntries();
         }
