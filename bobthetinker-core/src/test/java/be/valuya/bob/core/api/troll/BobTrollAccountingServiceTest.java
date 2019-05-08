@@ -62,13 +62,19 @@ public class BobTrollAccountingServiceTest {
 
     @Test
     public void testStreamEntries() {
-        bobAccountingManager.streamAccountingEntries(eventListener)
+        bobAccountingManager.streamAccountingEntries()
                 .forEach(bobThePrinter::printAccountingEntry);
     }
 
     @Test
+    public void testStreamBalances() {
+        bobAccountingManager.streamAccountBalances()
+                .forEach(bobThePrinter::printBalance);
+    }
+
+    @Test
     public void testStreamDocuments() {
-        bobAccountingManager.streamAccountingEntries(eventListener)
+        bobAccountingManager.streamAccountingEntries()
                 .map(ATAccountingEntry::getDocumentOptional)
                 .filter(Optional::isPresent)
                 .map(Optional::get)

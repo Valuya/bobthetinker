@@ -1,6 +1,7 @@
 package be.valuya.bob.core.util.print;
 
 import be.valuya.accountingtroll.domain.ATAccount;
+import be.valuya.accountingtroll.domain.ATAccountBalance;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
@@ -102,5 +103,16 @@ public class BobThePrinter {
         System.out.println(message);
         balanceChangeEvent.getAccountingEntryOptional()
                 .ifPresent(this::printAccountingEntry);
+    }
+
+    public void printBalance(ATAccountBalance atAccountBalance) {
+        ATAccount account = atAccountBalance.getAccount();
+        String accountCode = account.getCode();
+        BigDecimal oldBalance = atAccountBalance.getPeriodStartBalance();
+        BigDecimal newBalance = atAccountBalance.getPeriodEndBalance();
+        String periodName = atAccountBalance.getPeriod().getName();
+        String message = MessageFormat.format("Balance: {0} account:{1} {2} -> {3}",
+                periodName, accountCode, oldBalance, newBalance);
+        System.out.println(message);
     }
 }

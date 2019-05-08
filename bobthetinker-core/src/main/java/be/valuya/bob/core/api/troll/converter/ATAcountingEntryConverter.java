@@ -50,6 +50,7 @@ public class ATAcountingEntryConverter {
         Optional<LocalDate> dueDateOptional = entry.getHduedateOptional();
         Optional<String> commentOptional = entry.getHremOptional();
         Optional<ATTax> taxOptional = Optional.empty(); //TODO
+        Optional<Integer> matchedDocNumber = entry.getHmatchnoOptional();
 
         ATAccountingEntry accountingEntry = new ATAccountingEntry();
         accountingEntry.setBookPeriod(bookPeriod);
@@ -66,7 +67,7 @@ public class ATAcountingEntryConverter {
         accountingEntry.setCommentOptional(commentOptional);
         accountingEntry.setTaxOptional(taxOptional);
         accountingEntry.setDocumentOptional(documentOptional);
-
+        accountingEntry.setMatched(matchedDocNumber.isPresent());
 
         // FIXME: side effect
         documentOptional.ifPresent(doc -> doc.setDateOptional(Optional.of(entryDate)));
@@ -146,7 +147,6 @@ public class ATAcountingEntryConverter {
         Integer entryMonth = entry.getHmonth();
         return isSamePeriod(bookPeriod, entryYear, entryMonth);
     }
-
 
     private boolean isSamePeriod(ATBookPeriod bookPeriod, int year, int month) {
         if (month == 0) {

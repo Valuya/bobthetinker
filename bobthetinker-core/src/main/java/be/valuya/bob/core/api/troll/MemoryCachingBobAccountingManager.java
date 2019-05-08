@@ -2,7 +2,9 @@ package be.valuya.bob.core.api.troll;
 
 import be.valuya.accountingtroll.AccountingEventListener;
 import be.valuya.accountingtroll.AccountingManager;
+import be.valuya.accountingtroll.cache.AccountBalanceSpliterator;
 import be.valuya.accountingtroll.domain.ATAccount;
+import be.valuya.accountingtroll.domain.ATAccountBalance;
 import be.valuya.accountingtroll.domain.ATAccountingEntry;
 import be.valuya.accountingtroll.domain.ATBookPeriod;
 import be.valuya.accountingtroll.domain.ATBookYear;
@@ -27,10 +29,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class MemoryCachingBobAccountingManager implements AccountingManager {
 
@@ -82,22 +84,32 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     @Override
-    public Stream<ATAccountingEntry> streamAccountingEntries(AccountingEventListener accountingEventListener) {
-        // Balance cache
-        Map<String, AccountBalance> balancesPerAccountCode = new ConcurrentSkipListMap<>();
+    public Stream<ATAccountingEntry> streamAccountingEntries() {
+        return accountingManagerCache.getAccountingEntries().stream()
+                .sorted();
+    }
 
-        Stream<ATAccountingEntry> entryStream = accountingManagerCache.getAccountingEntries()
-                .stream()
-                .sorted()
-                .flatMap(entry -> streamWithBalanceCheck(entry, balancesPerAccountCode, accountingEventListener));
+    @Override
+    public Stream<ATAccountBalance> streamAccountBalances() {
+        List<ATBookPeriod> allPeriods = streamPeriods().sorted()
+                .collect(Collectors.toList());
+        Stream<ATAccountingEntry> entryStream = streamAccountingEntries();
+        AccountBalanceSpliterator balanceSpliterator = new AccountBalanceSpliterator(entryStream, allPeriods);
 
-        // Ensure all accounts with the yealryReset flag will fire a balance change event if relevant.
-        streamAccounts().filter(ATAccount::isYearlyBalanceReset)
-                .map(account -> this.createYearlyResetBalanceChangeEventOptional(account, balancesPerAccountCode))
-                .flatMap(this::streamOptional)
-                .forEach(accountingEventListener::handleBalanceChangeEvent);
+        BalanceComputationMode balanceComputationMode = bobFileConfiguration.getBalanceComputationMode();
 
-        return entryStream;
+        switch (balanceComputationMode) {
+            case BOOK_YEAR_ENTRIES_ONLY:
+                balanceSpliterator.setIgnoreIntermediatePeriodOpeningEntry(false);
+                balanceSpliterator.setResetEveryYear(true);
+                break;
+            case IGNORE_OPENINGS_FOR_INTERMEDIATE_YEARS:
+                balanceSpliterator.setIgnoreIntermediatePeriodOpeningEntry(true);
+                balanceSpliterator.setResetEveryYear(false);
+                break;
+        }
+
+        return StreamSupport.stream(balanceSpliterator, false);
     }
 
     @Override
@@ -156,206 +168,6 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
         return documentPath;
     }
 
-
-    private Optional<BalanceChangeEvent> createYearlyResetBalanceChangeEventOptional(ATAccount atAccount, Map<String, AccountBalance> balancesPerAccountCode) {
-        ATBookPeriod lastBookYearOpening = streamPeriods().filter(p -> p.getPeriodType() == ATPeriodType.OPENING)
-                .reduce((c, n) -> n)
-                .orElseThrow(() -> new BobException("No period opening"));
-        LocalDate balanceResetDate = lastBookYearOpening.getStartDate();
-
-        String accountCode = atAccount.getCode();
-        AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
-
-        // If there is already a balance dated in this book year, skip
-        boolean hasValidBalance = Optional.ofNullable(accountBalanceNullable)
-                .filter(b -> !b.getDate().isBefore(balanceResetDate))
-                .isPresent();
-        if (hasValidBalance) {
-            return Optional.empty();
-        }
-
-        // Otherwise, reset balance to 0 and fire event
-        AccountBalance accountBalance = createAccountBalance(atAccount, balanceResetDate, lastBookYearOpening, ZERO_EURO);
-        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(accountBalance, Optional.empty());
-        return Optional.of(balanceChangeEvent);
-    }
-
-    private Stream<ATAccountingEntry> streamWithBalanceCheck(ATAccountingEntry entry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
-        BalanceComputationMode balanceComputationMode = bobFileConfiguration.getBalanceComputationMode();
-        switch (balanceComputationMode) {
-            case BOOK_YEAR_ENTRIES_ONLY:
-                return this.checkBalanceResetingOnNewBookYear(entry, balancesPerAccountCode, accountingEventListener);
-            case IGNORE_OPENINGS_FOR_INTERMEDIATE_YEARS:
-                return this.checkBalanceChangeIgnoringIntermediateOpeningPeriods(entry, balancesPerAccountCode, accountingEventListener);
-            default:
-                throw new BobException("Unhandled balance computation mode: " + balanceComputationMode);
-        }
-    }
-
-    private Stream<ATAccountingEntry> checkBalanceResetingOnNewBookYear(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
-        ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
-        ATPeriodType periodType = bookPeriod.getPeriodType();
-
-        Optional<AccountBalance> currentBalance = getResettedBalanceOnBookYearChange(atAccountingEntry, balancesPerAccountCode);
-        AccountBalance newBalance;
-        if (periodType == ATPeriodType.OPENING) {
-            newBalance = resetAccountBalance(atAccountingEntry, balancesPerAccountCode);
-        } else {
-            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode, currentBalance);
-        }
-        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(newBalance, Optional.of(atAccountingEntry));
-        accountingEventListener.handleBalanceChangeEvent(balanceChangeEvent);
-
-        return Stream.of(atAccountingEntry);
-    }
-
-    private Stream<ATAccountingEntry> checkBalanceChangeIgnoringIntermediateOpeningPeriods(ATAccountingEntry atAccountingEntry, Map<String, AccountBalance> balancesPerAccountCode, AccountingEventListener accountingEventListener) {
-        ATAccount atAccount = atAccountingEntry.getAccount();
-        String accountCode = atAccount.getCode();
-        ATBookPeriod bookPeriod = atAccountingEntry.getBookPeriod();
-        ATPeriodType periodType = bookPeriod.getPeriodType();
-
-        AccountBalance curBalance = balancesPerAccountCode.get(accountCode);
-        AccountBalance newBalance;
-        if (curBalance == null) {
-            if (periodType != ATPeriodType.OPENING) {
-                // TODO: warn? Without any amount for the opening of the first book year, we have to assume it was 0
-            }
-            newBalance = resetAccountBalance(atAccountingEntry, balancesPerAccountCode);
-        } else if (periodType != ATPeriodType.OPENING) {
-            newBalance = updateAccountBalanceAfterAccountingEntry(atAccountingEntry, balancesPerAccountCode);
-        } else {
-            // Ignore
-            return Stream.empty();
-        }
-        BalanceChangeEvent balanceChangeEvent = createBalanceChangeEvent(newBalance, Optional.of(atAccountingEntry));
-        accountingEventListener.handleBalanceChangeEvent(balanceChangeEvent);
-        return Stream.of(atAccountingEntry);
-    }
-
-
-    private BalanceChangeEvent createBalanceChangeEvent(AccountBalance accountBalance, Optional<ATAccountingEntry> accountingEntryOptional) {
-        ATAccount account = accountBalance.getAccount();
-        BigDecimal balanceAmount = accountBalance.getBalance();
-        LocalDate balanceDate = accountBalance.getDate();
-
-        BalanceChangeEvent changeEvent = new BalanceChangeEvent();
-        changeEvent.setAccount(account);
-        changeEvent.setNewBalance(balanceAmount);
-        changeEvent.setDate(balanceDate);
-        changeEvent.setAccountingEntryOptional(accountingEntryOptional);
-        return changeEvent;
-    }
-
-
-    private AccountBalance resetAccountBalance(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
-        LocalDate date = accountingEntry.getDate();
-        BigDecimal amount = accountingEntry.getAmount();
-
-        // For a single period opening, we might have multiple entries for a single account: one debit, one credit for instance.
-        BigDecimal newBalance = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode)
-                .filter(balance -> isSamePeriod(balance, accountingEntry))
-                .map(AccountBalance::getBalance)
-                .map(amount::add)
-                .orElse(amount);
-
-        AccountBalance accountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, newBalance);
-        return accountBalance;
-    }
-
-
-    private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
-        Optional<AccountBalance> yearlyAdjustedAccountBalanceOptional = getYearlyAdjustedAccountBalanceOptional(accountingEntry, balancesPerAccountCode);
-        return updateAccountBalanceAfterAccountingEntry(accountingEntry, balancesPerAccountCode, yearlyAdjustedAccountBalanceOptional);
-    }
-
-    private AccountBalance updateAccountBalanceAfterAccountingEntry(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode, Optional<AccountBalance> currentBalanceOptional) {
-        BigDecimal entryAmount = accountingEntry.getAmount();
-        LocalDate date = accountingEntry.getDate();
-        BigDecimal newBalance = currentBalanceOptional
-                .map(AccountBalance::getBalance)
-                .map(entryAmount::add)
-                .orElse(entryAmount);
-        AccountBalance newAccountBalance = setAccountBalance(accountingEntry, balancesPerAccountCode, date, newBalance);
-        return newAccountBalance;
-    }
-
-    private Optional<AccountBalance> getYearlyAdjustedAccountBalanceOptional(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
-        ATAccount account = accountingEntry.getAccount();
-        String accountCode = account.getCode();
-        boolean yearlyBalanceReset = account.isYearlyBalanceReset();
-        AccountBalance accountBalanceNullable = balancesPerAccountCode.get(accountCode);
-        Optional<AccountBalance> accountBalanceOptional = Optional.ofNullable(accountBalanceNullable);
-
-        if (!yearlyBalanceReset) {
-            return accountBalanceOptional;
-        } else {
-            return accountBalanceOptional
-                    .map(accountBalance -> getResettedBalanceOnBookYearChange(accountBalance, accountingEntry));
-        }
-    }
-
-    private Optional<AccountBalance> getResettedBalanceOnBookYearChange(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode) {
-        ATAccount account = accountingEntry.getAccount();
-        String accountCode = account.getCode();
-        AccountBalance curBalanceNullable = balancesPerAccountCode.get(accountCode);
-        Optional<AccountBalance> accountBalanceOptional = Optional.ofNullable(curBalanceNullable);
-        return accountBalanceOptional
-                .map(balance -> getResettedBalanceOnBookYearChange(balance, accountingEntry));
-    }
-
-    private AccountBalance getResettedBalanceOnBookYearChange(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
-        ATAccount account = accountBalance.getAccount();
-        if (isSameBookYear(accountBalance, accountingEntry)) {
-            return accountBalance;
-        } else {
-            LocalDate date = accountingEntry.getDate();
-            ATBookPeriod bookPeriod = accountingEntry.getBookPeriod();
-            return createAccountBalance(account, date, bookPeriod, ZERO_EURO);
-        }
-    }
-
-
-    private boolean isSamePeriod(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
-        ATBookPeriod balancePeriod = accountBalance.getPeriod();
-        ATBookPeriod entryPeriod = accountingEntry.getBookPeriod();
-        return balancePeriod.equals(entryPeriod);
-    }
-
-
-    private boolean isSameBookYear(AccountBalance accountBalance, ATAccountingEntry accountingEntry) {
-        ATBookPeriod balancePeriod = accountBalance.getPeriod();
-        ATBookYear balanceBookYear = balancePeriod.getBookYear();
-        ATBookPeriod entryPeriod = accountingEntry.getBookPeriod();
-        ATBookYear entryBookyear = entryPeriod.getBookYear();
-        return balanceBookYear.equals(entryBookyear);
-    }
-
-    private AccountBalance createAccountBalance(ATAccount atAccount, LocalDate date, ATBookPeriod bookPeriod, BigDecimal newBalanceAmount) {
-        AccountBalance newBalance = new AccountBalance();
-        newBalance.setAccount(atAccount);
-        newBalance.setBalance(newBalanceAmount);
-        newBalance.setPeriod(bookPeriod);
-        newBalance.setDate(date);
-
-        return newBalance;
-    }
-
-    private AccountBalance setAccountBalance(ATAccountingEntry accountingEntry, Map<String, AccountBalance> balancesPerAccountCode, LocalDate date, BigDecimal amount) {
-        ATBookPeriod bookPeriod = accountingEntry.getBookPeriod();
-        ATAccount account = accountingEntry.getAccount();
-        String accountCode = account.getCode();
-
-        AccountBalance accountBalance = createAccountBalance(account, date, bookPeriod, amount);
-        balancesPerAccountCode.put(accountCode, accountBalance);
-        return accountBalance;
-    }
-
-
-    private <T> Stream<T> streamOptional(Optional<T> optionalValue) {
-        return optionalValue.map(Stream::of)
-                .orElseGet(Stream::empty);
-    }
 
     private Path getDocumentAbsolutePath(ATDocument atDocument) throws IOException {
         if (atDocument.getDateOptional().isPresent()) {

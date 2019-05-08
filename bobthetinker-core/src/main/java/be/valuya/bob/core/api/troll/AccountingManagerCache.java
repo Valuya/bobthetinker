@@ -14,6 +14,8 @@ import be.valuya.bob.core.api.troll.converter.ATBookPeriodConverter;
 import be.valuya.bob.core.api.troll.converter.ATDocumentConverter;
 import be.valuya.bob.core.api.troll.converter.ATThirdPartyConverter;
 import be.valuya.bob.core.config.BobFileConfiguration;
+import be.valuya.bob.core.domain.BobAccountHistoryEntry;
+import be.valuya.bob.core.domain.BobDocument;
 import be.valuya.bob.core.domain.BobException;
 import be.valuya.bob.core.domain.BobPeriod;
 
@@ -23,6 +25,7 @@ import javax.validation.Validation;
 import javax.validation.Validator;
 import javax.validation.ValidatorFactory;
 import java.text.MessageFormat;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -185,15 +188,17 @@ public class AccountingManagerCache {
                 .collect(Collectors.groupingBy(BobPeriod::getfYear))
                 .entrySet()
                 .stream()
-                .map(entry -> atBookPeriodConverter.convertToTrollBookYear(entry.getKey(), entry.getValue()));
+                .map(entry -> atBookPeriodConverter.convertToTrollBookYear(entry.getKey(), entry.getValue()))
+                .filter(this::isBookYearIncluded);
     }
-
 
     private Stream<ATBookPeriod> streamPeriods() {
         return bobTheTinker.readPeriods(bobFileConfiguration)
                 .filter(this::isValidRecord)
+                .filter(this::isPeriodBookYearIncluded)
                 .map(atBookPeriodConverter::convertToTrollPeriod);
     }
+
 
     private Stream<ATThirdParty> streamThirdParties() {
         return bobTheTinker.readCompanies(bobFileConfiguration)
@@ -204,14 +209,18 @@ public class AccountingManagerCache {
     private Stream<ATAccountingEntry> streamAccountingEntries() {
         return bobTheTinker.readAccountHistoryEntries(bobFileConfiguration)
                 .filter(this::isValidRecord)
+                .filter(this::isEntryBookYearIncluded)
                 .map(atAcountingEntryConverter::convertToTrollAccountingEntry);
     }
+
 
     private Stream<ATDocument> streamDocuments() {
         return bobTheTinker.readDocuments(bobFileConfiguration)
                 .filter(this::isValidRecord)
+                .filter(this::isDocumentBookYearIncluded)
                 .map(atDocumentConverter::convertToTrollDocument);
     }
+
 
     private <T> boolean isValidRecord(T record) {
         boolean throwOnInvalidRecord = bobFileConfiguration.isThrowOnInvalidRecord();
@@ -231,4 +240,42 @@ public class AccountingManagerCache {
         }
     }
 
+    private boolean isBookYearIncluded(ATBookYear year) {
+        LocalDate startDate = year.getStartDate();
+        boolean minStartDateViolated = bobFileConfiguration.getBookYearMinStartDateOptional()
+                .map(minStartDate -> minStartDate.isAfter(startDate))
+                .orElse(false);
+        boolean maxStartDateViolated = bobFileConfiguration.getBookYearMaxStartDateOptional()
+                .map(maxStartDate -> maxStartDate.isBefore(startDate))
+                .orElse(false);
+        return !maxStartDateViolated && !minStartDateViolated;
+    }
+
+    private boolean isPeriodBookYearIncluded(BobPeriod period) {
+        String periodBookYearName = period.getfYear();
+        ATBookYear bookyearNullable = bookYearsByName.get(periodBookYearName);
+        return Optional.ofNullable(bookyearNullable)
+                .map(this::isBookYearIncluded)
+                // silents potential data inconsistency
+                .orElse(false);
+    }
+
+    private boolean isEntryBookYearIncluded(BobAccountHistoryEntry entry) {
+        String bookYearName = entry.getHfyear();
+        ATBookYear bookyearNullable = bookYearsByName.get(bookYearName);
+        return Optional.ofNullable(bookyearNullable)
+                .map(this::isBookYearIncluded)
+                // silents potential data inconsistency
+                .orElse(false);
+    }
+
+
+    private boolean isDocumentBookYearIncluded(BobDocument document) {
+        String bookYearName = document.getFyear();
+        ATBookYear bookyearNullable = bookYearsByName.get(bookYearName);
+        return Optional.ofNullable(bookyearNullable)
+                .map(this::isBookYearIncluded)
+                // silents potential data inconsistency
+                .orElse(false);
+    }
 }
