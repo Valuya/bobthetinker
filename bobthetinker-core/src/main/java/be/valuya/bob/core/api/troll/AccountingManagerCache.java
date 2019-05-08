@@ -242,10 +242,10 @@ public class AccountingManagerCache {
 
     private boolean isBookYearIncluded(ATBookYear year) {
         LocalDate startDate = year.getStartDate();
-        boolean minStartDateViolated = bobFileConfiguration.getBookYearMinStartDate()
+        boolean minStartDateViolated = bobFileConfiguration.getBookYearMinStartDateOptional()
                 .map(minStartDate -> minStartDate.isAfter(startDate))
                 .orElse(false);
-        boolean maxStartDateViolated = bobFileConfiguration.getBookYearMaxStartDate()
+        boolean maxStartDateViolated = bobFileConfiguration.getBookYearMaxStartDateOptional()
                 .map(maxStartDate -> maxStartDate.isBefore(startDate))
                 .orElse(false);
         return !maxStartDateViolated && !minStartDateViolated;

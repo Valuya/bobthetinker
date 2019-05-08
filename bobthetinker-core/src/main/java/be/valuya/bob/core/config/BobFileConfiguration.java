@@ -16,8 +16,8 @@ public class BobFileConfiguration {
     private BalanceComputationMode balanceComputationMode;
     private DocumentFileReconciliationMode documentFileReconciliationMode;
 
-    private Optional<LocalDate> bookYearMinStartDate = Optional.empty();
-    private Optional<LocalDate> bookYearMaxStartDate = Optional.empty();
+    private Optional<LocalDate> bookYearMinStartDateOptional = Optional.empty();
+    private Optional<LocalDate> bookYearMaxStartDateOptional = Optional.empty();
 
     public BobFileConfiguration(Path baseFolderPath) {
         this.baseFolderPath = baseFolderPath;
@@ -75,19 +75,19 @@ public class BobFileConfiguration {
         this.throwOnInvalidRecord = throwOnInvalidRecord;
     }
 
-    public Optional<LocalDate> getBookYearMinStartDate() {
-        return bookYearMinStartDate;
+    public Optional<LocalDate> getBookYearMinStartDateOptional() {
+        return bookYearMinStartDateOptional;
     }
 
     public void setBookYearMinStartDate(LocalDate bookYearMinStartDate) {
-        this.bookYearMinStartDate = Optional.of(bookYearMinStartDate);
+        this.bookYearMinStartDateOptional = Optional.of(bookYearMinStartDate);
     }
 
-    public Optional<LocalDate> getBookYearMaxStartDate() {
-        return bookYearMaxStartDate;
+    public Optional<LocalDate> getBookYearMaxStartDateOptional() {
+        return bookYearMaxStartDateOptional;
     }
 
     public void setBookYearMaxStartDate(LocalDate bookYearMaxStartDate) {
-        this.bookYearMaxStartDate = Optional.of(bookYearMaxStartDate);
+        this.bookYearMaxStartDateOptional = Optional.of(bookYearMaxStartDate);
     }
 }
