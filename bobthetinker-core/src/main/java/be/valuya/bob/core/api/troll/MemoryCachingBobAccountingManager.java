@@ -132,10 +132,10 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
     }
 
     @Override
-    public void uploadDocument(Path documentPath, InputStream inputStream) throws Exception {
+    public void uploadDocument(String documentRelativePathName, InputStream inputStream) throws Exception {
         Path baseFolderPath = bobFileConfiguration.getBaseFolderPath();
         Path documentFullPath = baseFolderPath.resolve(DOCUMENT_UPLOAD_PATH_NAME)
-                .resolve(documentPath);
+                .resolve(documentRelativePathName);
         Path documentDirectoryPath = documentFullPath.getParent();
 
         Files.createDirectories(documentDirectoryPath);
