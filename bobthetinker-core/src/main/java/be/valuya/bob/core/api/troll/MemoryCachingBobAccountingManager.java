@@ -17,6 +17,7 @@ import be.valuya.bob.core.config.BalanceComputationMode;
 import be.valuya.bob.core.config.BobFileConfiguration;
 import be.valuya.bob.core.config.DocumentFileReconciliationMode;
 import be.valuya.bob.core.domain.BobException;
+import be.valuya.bob.core.util.path.PathUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -138,7 +139,7 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
                 .resolve(documentRelativePathName);
         Path documentDirectoryPath = documentFullPath.getParent();
 
-        Files.createDirectories(documentDirectoryPath);
+        PathUtils.createDireHierarchyIfNotExists(documentDirectoryPath);
         Files.copy(inputStream, documentFullPath, StandardCopyOption.REPLACE_EXISTING);
     }
 
