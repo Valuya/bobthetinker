@@ -7,7 +7,7 @@
     <groupId>be.valuya.bob</groupId>
     <artifactId>bobthetinker-parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.1.2-SNAPSHOT</version>
+    <version>1.2.0</version>
 
     <modules>
         <module>bobthetinker-core</module>
