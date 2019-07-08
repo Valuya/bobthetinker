@@ -59,11 +59,15 @@ public class ATBookPeriodConverter {
         BobPeriod lastPeriod = periods.get(periods.size() - 1);
         LocalDate periodStartDate = getPeriodStartDate(firstPeriod);
         LocalDate periodEndDate = getPeriodEndDate(lastPeriod);
+        Boolean archived = firstPeriod.getFxActiveOptional()
+                .map(active -> !active)
+                .orElse(false);
 
         ATBookYear bookYear = new ATBookYear();
         bookYear.setName(fYear);
         bookYear.setStartDate(periodStartDate);
         bookYear.setEndDate(periodEndDate);
+        bookYear.setArchived(archived);
 
         return bookYear;
     }

@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -134,13 +135,31 @@ public class MemoryCachingBobAccountingManager implements AccountingManager {
 
     @Override
     public void uploadDocument(String documentRelativePathName, InputStream inputStream) throws Exception {
-        Path baseFolderPath = bobFileConfiguration.getBaseFolderPath();
-        Path documentFullPath = baseFolderPath.resolve(DOCUMENT_UPLOAD_PATH_NAME)
-                .resolve(documentRelativePathName);
-        Path documentDirectoryPath = documentFullPath.getParent();
+        Path documentRelativePath = Paths.get(documentRelativePathName);
+        int documentFileNamePathCount = documentRelativePath.getNameCount();
+        if (documentFileNamePathCount < 0) {
+            throw new BobException("Invalid document path name");
+        }
+        boolean documentPathIsAbsolute = documentRelativePath.isAbsolute();
+        if (documentPathIsAbsolute) {
+            throw new BobException("Document path is absolute");
+        }
 
+        Path baseFolderPath = bobFileConfiguration.getBaseFolderPath();
+        Path documentDirectoryPath = baseFolderPath.resolve(DOCUMENT_UPLOAD_PATH_NAME)
+                .resolve(DOCUMENT_UPLOAD_PATH_NAME)
+                .resolve(documentRelativePathName)
+                .getParent();
+        String documentFileName = documentRelativePath
+                .getFileName()
+                .toString();
+
+        // TODO: resolve case insensitive siblings
         PathUtils.createDireHierarchyIfNotExists(documentDirectoryPath);
-        Files.copy(inputStream, documentFullPath, StandardCopyOption.REPLACE_EXISTING);
+
+        Path documentPath = documentDirectoryPath.resolve(documentFileName);
+
+        Files.copy(inputStream, documentPath, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private Optional<Path> findDocumentFilePathFromParentDirectory(ATDocument atDocument) throws IOException {
